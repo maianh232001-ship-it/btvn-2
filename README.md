@@ -1,5 +1,7 @@
 # BTVN — Backlink Audit Web App
 
+🌐 **Live demo**: https://btvn-2.onrender.com (~30 giây loading lần đầu vì Render free tier ngủ khi không có traffic)
+
 Công cụ web đơn giản: tải lên file backlinks Ahrefs (.xlsx), nhập từ khoá lọc, nhận về báo cáo Excel 2 sheet có style sẵn (đã loại Black Hat, tô màu theo Domain Rating).
 
 Theme vàng `#F5C518`, font Helvetica.
