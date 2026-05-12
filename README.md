@@ -1,6 +1,16 @@
 # BTVN — Backlink Audit Web App
 
-🌐 **Live demo**: https://btvn-2.onrender.com (~30 giây loading lần đầu vì Render free tier ngủ khi không có traffic)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-btvn--2.onrender.com-F5C518?style=for-the-badge&logo=render&logoColor=black)](https://btvn-2.onrender.com)
+[![Python](https://img.shields.io/badge/Python-3.12-blue?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
+[![Flask](https://img.shields.io/badge/Flask-3.0-000000?style=for-the-badge&logo=flask&logoColor=white)](https://flask.palletsprojects.com/)
+
+## 👉 Xem ngay bản giao diện
+
+**https://btvn-2.onrender.com**
+
+> Lần đầu mở có thể mất ~30 giây vì Render free tier ngủ khi không có traffic. Lần sau nhanh ngay.
+
+---
 
 Công cụ web đơn giản: tải lên file backlinks Ahrefs (.xlsx), nhập từ khoá lọc, nhận về báo cáo Excel 2 sheet có style sẵn (đã loại Black Hat, tô màu theo Domain Rating).
 
