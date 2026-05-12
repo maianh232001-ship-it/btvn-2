@@ -1,0 +1,99 @@
+"""Flask web app: upload backlinks XLSX → download styled audit report."""
+from __future__ import annotations
+
+import os
+import re
+import secrets
+import uuid
+from pathlib import Path
+
+from flask import (Flask, abort, jsonify, render_template, request,
+                   send_from_directory, url_for)
+from werkzeug.utils import secure_filename
+
+from audit import run_audit
+
+
+BASE_DIR = Path(__file__).resolve().parent
+UPLOAD_DIR = BASE_DIR / "uploads"
+OUTPUT_DIR = BASE_DIR / "outputs"
+UPLOAD_DIR.mkdir(exist_ok=True)
+OUTPUT_DIR.mkdir(exist_ok=True)
+
+ALLOWED_EXT = {".xlsx"}
+MAX_BYTES = 25 * 1024 * 1024  # 25 MB
+
+app = Flask(__name__, static_folder="static", template_folder="templates")
+app.config["MAX_CONTENT_LENGTH"] = MAX_BYTES
+
+
+def _safe_label(label: str) -> str:
+    """Sanitize a label so it's safe as a filename token."""
+    s = re.sub(r"[^A-Za-z0-9_\-]+", "_", (label or "").strip())
+    return s.strip("_") or "report"
+
+
+@app.route("/")
+def index():
+    return render_template("index.html")
+
+
+@app.route("/api/audit", methods=["POST"])
+def audit_endpoint():
+    file = request.files.get("backlinks")
+    keyword = (request.form.get("keyword") or "").strip()
+    product_label = (request.form.get("product_label") or keyword).strip()
+
+    if not file or not file.filename:
+        return jsonify({"error": "Bạn chưa chọn file backlinks (.xlsx)."}), 400
+    if not keyword:
+        return jsonify({"error": "Bạn chưa nhập từ khoá lọc Target URL."}), 400
+
+    ext = Path(file.filename).suffix.lower()
+    if ext not in ALLOWED_EXT:
+        return jsonify({"error": "Chỉ chấp nhận file .xlsx."}), 400
+
+    token = secrets.token_hex(8)
+    safe_name = secure_filename(file.filename) or "backlinks.xlsx"
+    in_path = UPLOAD_DIR / f"{token}__{safe_name}"
+    file.save(in_path)
+
+    out_name = f"chi_tiet_anchor_backlink_{_safe_label(product_label)}__{token}.xlsx"
+    out_path = OUTPUT_DIR / out_name
+
+    try:
+        stats = run_audit(str(in_path), keyword, str(out_path),
+                          product_label=product_label)
+    except Exception as exc:  # surface error to the UI
+        try:
+            in_path.unlink(missing_ok=True)
+        except Exception:
+            pass
+        return jsonify({"error": f"Xử lý thất bại: {exc}"}), 500
+
+    try:
+        in_path.unlink(missing_ok=True)
+    except Exception:
+        pass
+
+    return jsonify({
+        "stats": stats,
+        "download_url": url_for("download_output", name=out_name),
+        "filename": out_name,
+    })
+
+
+@app.route("/download/<path:name>")
+def download_output(name: str):
+    safe = secure_filename(name)
+    if safe != name:
+        abort(404)
+    file_path = OUTPUT_DIR / safe
+    if not file_path.exists():
+        abort(404)
+    return send_from_directory(OUTPUT_DIR, safe, as_attachment=True)
+
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", "5050"))
+    app.run(host="127.0.0.1", port=port, debug=False)

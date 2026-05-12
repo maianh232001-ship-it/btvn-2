@@ -1,0 +1,18 @@
+# Runtime data — never commit user uploads or generated reports
+uploads/
+outputs/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# Logs
+*.log

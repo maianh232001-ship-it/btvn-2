@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Backlink Audit Tool</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="brand">
+      <span class="logo">★</span>
+      <span class="brand-name">Backlink Audit</span>
+    </div>
+    <span class="tagline">Lọc Black Hat · Báo cáo Excel sẵn sàng gửi</span>
+  </header>
+
+  <main>
+    <section class="hero">
+      <h1>Audit backlink từ file dữ liệu của bạn</h1>
+      <p>Tải lên file <strong>Ahrefs backlinks (.xlsx)</strong>, nhập từ khoá Target URL (ví dụ <em>reno15</em>), nhận về file báo cáo có 2 sheet đã chia nhóm, tô màu theo Domain Rating.</p>
+    </section>
+
+    <form id="audit-form" class="card">
+      <div class="field">
+        <label for="backlinks">1. File backlinks (.xlsx)</label>
+        <div class="drop" id="drop">
+          <input type="file" name="backlinks" id="backlinks" accept=".xlsx" required hidden />
+          <div class="drop-inner">
+            <span class="drop-icon">⤓</span>
+            <span class="drop-text">Kéo thả file vào đây hoặc <button type="button" id="pick-btn" class="link-btn">chọn file</button></span>
+            <span class="drop-hint" id="drop-hint">Hỗ trợ <code>www....-backlinks-subdomains_*.xlsx</code> · tối đa 25 MB</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label for="keyword">2. Từ khoá Target URL</label>
+          <input type="text" name="keyword" id="keyword" placeholder="vd: reno15" required />
+          <small>Chỉ giữ các backlink có Target URL chứa chuỗi này.</small>
+        </div>
+        <div class="field">
+          <label for="product_label">3. Nhãn sản phẩm (tuỳ chọn)</label>
+          <input type="text" name="product_label" id="product_label" placeholder="vd: Reno15" />
+          <small>Dùng cho tiêu đề báo cáo & tên file. Để trống sẽ lấy theo từ khoá.</small>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button type="submit" id="submit-btn" class="primary">Bắt đầu audit</button>
+        <span id="status" class="status" aria-live="polite"></span>
+      </div>
+    </form>
+
+    <section id="result" class="card result hidden">
+      <h2>Kết quả</h2>
+      <div class="stats" id="stats"></div>
+      <a id="download-link" class="primary download" href="#" download>⇩ Tải báo cáo Excel</a>
+    </section>
+
+    <section class="card guide">
+      <h2>Định dạng đầu ra</h2>
+      <ul>
+        <li><strong>Sheet 1 — Chi Tiết URL vs Anchor:</strong> liệt kê từng backlink theo Target URL, đã loại bỏ Black Hat. Dòng có DR ≥ 50 tô <span class="swatch hi"></span> xanh lá.</li>
+        <li><strong>Sheet 2 — 📊 Domain vs URL:</strong> đếm số link & DR cao nhất theo domain nguồn. DR ≥ 50 tô <span class="swatch hi"></span>, DR 20–49 tô <span class="swatch mid"></span> vàng.</li>
+      </ul>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    Theme · Helvetica · Yellow #F5C518
+  </footer>
+
+  <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
