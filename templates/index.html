@@ -19,6 +19,10 @@
     <section class="hero">
       <h1>Audit backlink từ file dữ liệu của bạn</h1>
       <p>Tải lên file <strong>Ahrefs backlinks (.xlsx)</strong>, nhập từ khoá Target URL (ví dụ <em>reno15</em>), nhận về file báo cáo có 2 sheet đã chia nhóm, tô màu theo Domain Rating.</p>
+      <div class="hero-actions">
+        <button type="button" id="demo-btn" class="primary outline">🎬 Xem demo mẫu (TGDĐ · Reno15)</button>
+        <span class="hero-hint">Để biết kết quả trông thế nào trước khi upload</span>
+      </div>
     </section>
 
     <div class="card">
@@ -111,8 +115,11 @@
     </div>
 
     <section id="result" class="card result hidden">
+      <div id="demo-banner" class="demo-banner hidden">
+        🎬 <strong>Đây là demo mẫu</strong> chạy trên dữ liệu backlinks của thegioididong.com lọc theo từ khoá <code>reno15</code>. Kết quả thật của bạn sẽ trông tương tự nhưng với dữ liệu riêng.
+      </div>
       <div class="result-head">
-        <h2>Kết quả</h2>
+        <h2 id="result-title">Kết quả</h2>
         <a id="download-link" class="primary download" href="#" download>⇩ Tải báo cáo Excel</a>
       </div>
       <div class="stats" id="stats"></div>

@@ -26,6 +26,15 @@ MAX_BYTES = 25 * 1024 * 1024  # 25 MB
 app = Flask(__name__, static_folder="static", template_folder="templates")
 app.config["MAX_CONTENT_LENGTH"] = MAX_BYTES
 
+# Bundled sample so visitors can preview the report format without uploading.
+DEMO_SAMPLE = BASE_DIR / (
+    "www.thegioididong.com-backlinks-subdomains_2026-05-09_02-31-21.xlsx"
+)
+DEMO_KEYWORD = "reno15"
+DEMO_LABEL = "Reno15"
+DEMO_FILENAME = "demo_reno15.xlsx"
+_demo_cache: dict | None = None
+
 
 def _safe_label(label: str) -> str:
     """Sanitize a label so it's safe as a filename token."""
@@ -36,6 +45,32 @@ def _safe_label(label: str) -> str:
 @app.route("/")
 def index():
     return render_template("index.html")
+
+
+@app.route("/api/demo")
+def demo_endpoint():
+    """Return a cached preview built from the bundled TGDĐ + Reno15 sample."""
+    global _demo_cache
+    if not DEMO_SAMPLE.exists():
+        return jsonify({"error": "File mẫu không có sẵn trên server."}), 404
+    if _demo_cache is None:
+        try:
+            result = run_audit(
+                str(DEMO_SAMPLE), DEMO_KEYWORD,
+                str(OUTPUT_DIR / DEMO_FILENAME),
+                product_label=DEMO_LABEL,
+            )
+        except Exception as exc:  # noqa: BLE001
+            return jsonify({"error": f"Lỗi tạo demo: {exc}"}), 500
+        preview = result.pop("preview", None)
+        _demo_cache = {"stats": result, "preview": preview}
+    return jsonify({
+        **_demo_cache,
+        "download_url": url_for("download_output", name=DEMO_FILENAME),
+        "filename": DEMO_FILENAME,
+        "source": "demo",
+        "demo": True,
+    })
 
 
 @app.route("/api/audit", methods=["POST"])

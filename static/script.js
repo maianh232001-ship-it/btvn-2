@@ -206,9 +206,19 @@
 
   function renderResult(data) {
     const s = data.stats || {};
-    const inputLabel = data.source === "ahrefs"
-      ? "Backlink từ Ahrefs"
-      : "Dòng đầu vào";
+    let inputLabel = "Dòng đầu vào";
+    if (data.source === "ahrefs") inputLabel = "Backlink từ Ahrefs";
+    else if (data.source === "demo") inputLabel = "Dòng trong file mẫu";
+
+    const demoBanner = document.getElementById("demo-banner");
+    const resultTitle = document.getElementById("result-title");
+    if (data.demo) {
+      demoBanner.classList.remove("hidden");
+      resultTitle.textContent = "Kết quả demo";
+    } else {
+      demoBanner.classList.add("hidden");
+      resultTitle.textContent = "Kết quả";
+    }
     const items = [
       [inputLabel, s.input_rows],
       ["Backlink chất lượng", s.kept_rows],
@@ -254,6 +264,28 @@
     ahrefsStatus.textContent = text || "";
     ahrefsStatus.className = "status" + (kind ? " " + kind : "");
   }
+
+  // --- Demo button (loads bundled TGDĐ + Reno15 sample) ---
+  const demoBtn = document.getElementById("demo-btn");
+  demoBtn.addEventListener("click", async function () {
+    const original = demoBtn.textContent;
+    demoBtn.disabled = true;
+    demoBtn.textContent = "Đang tải demo…";
+    try {
+      const res = await fetch("/api/demo");
+      const data = await res.json().catch(function () { return {}; });
+      if (!res.ok) {
+        alert(data.error || ("Lỗi tải demo (" + res.status + ")"));
+        return;
+      }
+      renderResult(data);
+    } catch (err) {
+      alert("Lỗi mạng: " + err.message);
+    } finally {
+      demoBtn.disabled = false;
+      demoBtn.textContent = original;
+    }
+  });
 
   ahrefsForm.addEventListener("submit", async function (e) {
     e.preventDefault();
