@@ -117,8 +117,8 @@
     return Number.isInteger(n) ? String(n) : n.toFixed(1);
   }
 
-  function renderDetailTable(detail) {
-    const host = document.getElementById("detail-table");
+  function renderDetailTable(detail, hostId) {
+    const host = document.getElementById(hostId || "detail-table");
     if (!detail || !detail.length) {
       host.innerHTML = '<div class="preview-empty">Không có backlink chất lượng phù hợp.</div>';
       return;
@@ -154,8 +154,8 @@
     host.innerHTML = html;
   }
 
-  function renderSummaryTable(summary) {
-    const host = document.getElementById("summary-table");
+  function renderSummaryTable(summary, hostId) {
+    const host = document.getElementById(hostId || "summary-table");
     if (!summary || !summary.length) {
       host.innerHTML = '<div class="preview-empty">Không có dữ liệu tổng hợp.</div>';
       return;
@@ -190,53 +190,51 @@
     if (head) head.parentElement.classList.toggle("collapsed");
   });
 
-  // Result tab switching.
-  document.querySelectorAll(".result-tabs .tab").forEach(function (tab) {
-    tab.addEventListener("click", function () {
-      const name = tab.getAttribute("data-result-tab");
-      document.querySelectorAll(".result-tabs .tab").forEach(function (t) {
-        t.classList.toggle("active", t === tab);
-      });
-      document.querySelectorAll(".result-panel").forEach(function (p) {
-        p.classList.toggle("active",
-          p.getAttribute("data-result-tab") === name);
+  // Tab switching for any group of .result-tabs — works for both the user's
+  // result section and the demo showcase by scoping selectors to the parent.
+  document.querySelectorAll(".result-tabs").forEach(function (group) {
+    const scope = group.parentElement;
+    const attr = group.querySelector(".tab[data-demo-tab]")
+      ? "data-demo-tab" : "data-result-tab";
+    group.querySelectorAll(".tab").forEach(function (tab) {
+      tab.addEventListener("click", function () {
+        const name = tab.getAttribute(attr);
+        group.querySelectorAll(".tab").forEach(function (t) {
+          t.classList.toggle("active", t === tab);
+        });
+        scope.querySelectorAll(".result-panel").forEach(function (p) {
+          p.classList.toggle("active", p.getAttribute(attr) === name);
+        });
       });
     });
   });
 
-  function renderResult(data) {
-    const s = data.stats || {};
-    let inputLabel = "Dòng đầu vào";
-    if (data.source === "ahrefs") inputLabel = "Backlink từ Ahrefs";
-    else if (data.source === "demo") inputLabel = "Dòng trong file mẫu";
-
-    const demoBanner = document.getElementById("demo-banner");
-    const resultTitle = document.getElementById("result-title");
-    if (data.demo) {
-      demoBanner.classList.remove("hidden");
-      resultTitle.textContent = "Kết quả demo";
-    } else {
-      demoBanner.classList.add("hidden");
-      resultTitle.textContent = "Kết quả";
-    }
+  function buildStatsHTML(stats, inputLabel) {
     const items = [
-      [inputLabel, s.input_rows],
-      ["Backlink chất lượng", s.kept_rows],
-      ["Target URL", s.target_urls],
-      ["Tổng link giữ lại", s.total_links],
-      ["Dòng tổng hợp domain", s.total_domain_rows],
+      [inputLabel, stats.input_rows],
+      ["Backlink chất lượng", stats.kept_rows],
+      ["Target URL", stats.target_urls],
+      ["Tổng link giữ lại", stats.total_links],
+      ["Dòng tổng hợp domain", stats.total_domain_rows],
     ];
-    statsEl.innerHTML = items.map(function (it) {
+    return items.map(function (it) {
       return '<div class="stat"><div class="label">' + it[0] +
              '</div><div class="value">' + (it[1] != null ? it[1] : "—") +
              "</div></div>";
     }).join("");
+  }
+
+  function renderResult(data) {
+    const s = data.stats || {};
+    const inputLabel = data.source === "ahrefs"
+      ? "Backlink từ Ahrefs" : "Dòng đầu vào";
+    statsEl.innerHTML = buildStatsHTML(s, inputLabel);
     downloadLink.href = data.download_url;
     downloadLink.setAttribute("download", data.filename || "audit.xlsx");
 
     const preview = data.preview || {};
-    renderDetailTable(preview.detail || []);
-    renderSummaryTable(preview.summary || []);
+    renderDetailTable(preview.detail || [], "detail-table");
+    renderSummaryTable(preview.summary || [], "summary-table");
 
     resultCard.classList.remove("hidden");
     resultCard.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -265,27 +263,32 @@
     ahrefsStatus.className = "status" + (kind ? " " + kind : "");
   }
 
-  // --- Demo button (loads bundled TGDĐ + Reno15 sample) ---
-  const demoBtn = document.getElementById("demo-btn");
-  demoBtn.addEventListener("click", async function () {
-    const original = demoBtn.textContent;
-    demoBtn.disabled = true;
-    demoBtn.textContent = "Đang tải demo…";
+  // --- Demo showcase (auto-loads bundled TGDĐ + Reno15 sample on page open) ---
+  async function loadDemoShowcase() {
+    const statsHost = document.getElementById("demo-stats");
     try {
       const res = await fetch("/api/demo");
       const data = await res.json().catch(function () { return {}; });
       if (!res.ok) {
-        alert(data.error || ("Lỗi tải demo (" + res.status + ")"));
+        statsHost.innerHTML =
+          '<div class="preview-empty">Không tải được dữ liệu mẫu: ' +
+          escapeHTML(data.error || res.status) + "</div>";
         return;
       }
-      renderResult(data);
+      statsHost.innerHTML = buildStatsHTML(data.stats || {}, "Dòng đầu vào");
+      const dl = document.getElementById("demo-download");
+      dl.href = data.download_url;
+      dl.setAttribute("download", data.filename || "demo.xlsx");
+      const preview = data.preview || {};
+      renderDetailTable(preview.detail || [], "demo-detail-table");
+      renderSummaryTable(preview.summary || [], "demo-summary-table");
     } catch (err) {
-      alert("Lỗi mạng: " + err.message);
-    } finally {
-      demoBtn.disabled = false;
-      demoBtn.textContent = original;
+      statsHost.innerHTML =
+        '<div class="preview-empty">Lỗi mạng khi tải mẫu: ' +
+        escapeHTML(err.message) + "</div>";
     }
-  });
+  }
+  loadDemoShowcase();
 
   ahrefsForm.addEventListener("submit", async function (e) {
     e.preventDefault();

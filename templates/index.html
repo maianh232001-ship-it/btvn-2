@@ -19,10 +19,7 @@
     <section class="hero">
       <h1>Audit backlink từ file dữ liệu của bạn</h1>
       <p>Tải lên file <strong>Ahrefs backlinks (.xlsx)</strong>, nhập từ khoá Target URL (ví dụ <em>reno15</em>), nhận về file báo cáo có 2 sheet đã chia nhóm, tô màu theo Domain Rating.</p>
-      <div class="hero-actions">
-        <button type="button" id="demo-btn" class="primary outline">🎬 Xem demo mẫu (TGDĐ · Reno15)</button>
-        <span class="hero-hint">Để biết kết quả trông thế nào trước khi upload</span>
-      </div>
+      <p class="hero-hint">👇 Cuộn xuống cuối trang để xem <a href="#demo-showcase">bảng kết quả mẫu</a> trước khi upload.</p>
     </section>
 
     <div class="card">
@@ -115,9 +112,6 @@
     </div>
 
     <section id="result" class="card result hidden">
-      <div id="demo-banner" class="demo-banner hidden">
-        🎬 <strong>Đây là demo mẫu</strong> chạy trên dữ liệu backlinks của thegioididong.com lọc theo từ khoá <code>reno15</code>. Kết quả thật của bạn sẽ trông tương tự nhưng với dữ liệu riêng.
-      </div>
       <div class="result-head">
         <h2 id="result-title">Kết quả</h2>
         <a id="download-link" class="primary download" href="#" download>⇩ Tải báo cáo Excel</a>
@@ -154,6 +148,41 @@
         <li><strong>Sheet 1 — Chi Tiết URL vs Anchor:</strong> liệt kê từng backlink theo Target URL, đã loại bỏ Black Hat. Dòng có DR ≥ 50 tô <span class="swatch hi"></span> xanh lá.</li>
         <li><strong>Sheet 2 — 📊 Domain vs URL:</strong> đếm số link & DR cao nhất theo domain nguồn. DR ≥ 50 tô <span class="swatch hi"></span>, DR 20–49 tô <span class="swatch mid"></span> vàng.</li>
       </ul>
+    </section>
+
+    <section id="demo-showcase" class="card showcase">
+      <div class="result-head">
+        <div>
+          <h2>📋 Bảng kết quả mẫu</h2>
+          <p class="showcase-desc">Audit chạy sẵn trên dữ liệu backlinks <strong>thegioididong.com</strong> lọc theo <code>reno15</code>. Khi bạn upload file riêng phía trên, kết quả sẽ trông tương tự nhưng với dữ liệu của bạn.</p>
+        </div>
+        <a id="demo-download" class="primary outline download" href="#" download>⇩ Tải file mẫu</a>
+      </div>
+      <div class="stats" id="demo-stats">
+        <div class="preview-empty">Đang tải dữ liệu mẫu…</div>
+      </div>
+
+      <div class="tabs result-tabs" role="tablist">
+        <button type="button" class="tab active" data-demo-tab="detail" role="tab">📋 Chi tiết URL vs Anchor</button>
+        <button type="button" class="tab" data-demo-tab="summary" role="tab">📊 Domain vs URL</button>
+      </div>
+
+      <div class="result-panel active" data-demo-tab="detail">
+        <div class="legend">
+          <span class="swatch hi"></span> DR ≥ 50
+          <span class="legend-sep">·</span>
+          <span class="swatch mid"></span> DR 20–49
+        </div>
+        <div id="demo-detail-table" class="preview-table"></div>
+      </div>
+      <div class="result-panel" data-demo-tab="summary">
+        <div class="legend">
+          <span class="swatch hi"></span> DR ≥ 50
+          <span class="legend-sep">·</span>
+          <span class="swatch mid"></span> DR 20–49
+        </div>
+        <div id="demo-summary-table" class="preview-table"></div>
+      </div>
     </section>
   </main>
 

@@ -72,14 +72,19 @@ main {
   line-height: 1.25;
 }
 .hero p { margin: 0; color: var(--ink-soft); }
-.hero-actions {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  margin-top: 16px;
-  flex-wrap: wrap;
+.hero-hint {
+  font-size: 13px;
+  color: var(--ink-soft);
+  margin-top: 12px;
 }
-.hero-hint { font-size: 13px; color: var(--ink-soft); }
+.hero-hint a {
+  color: var(--ink);
+  font-weight: 700;
+  border-bottom: 2px solid var(--yellow);
+  text-decoration: none;
+}
+.hero-hint a:hover { border-bottom-color: var(--yellow-deep); }
+
 .primary.outline {
   background: #fff;
   color: var(--ink);
@@ -89,16 +94,17 @@ main {
   background: var(--yellow-soft);
 }
 
-.demo-banner {
-  background: var(--yellow-soft);
-  border: 1px solid var(--yellow-deep);
-  border-radius: 8px;
-  padding: 10px 14px;
-  font-size: 13px;
-  color: var(--ink);
-  margin-bottom: 14px;
+.showcase {
+  border-left: 6px solid var(--yellow-deep);
+  background: #FFFEF7;
 }
-.demo-banner code {
+.showcase-desc {
+  margin: 6px 0 0;
+  color: var(--ink-soft);
+  font-size: 13px;
+  max-width: 580px;
+}
+.showcase-desc code {
   background: #fff;
   padding: 1px 6px;
   border-radius: 4px;
