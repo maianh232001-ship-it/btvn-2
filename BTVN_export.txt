@@ -1,28 +1,142 @@
 ================================================================================
   BTVN — Backlink Audit Web App — Toàn bộ source code
-  Exported: 2026-05-12
+  Exported: 2026-05-14
+  Repo: https://github.com/maianh232001-ship-it/btvn-2
+  Live: https://btvn-2.onrender.com
+
   Cấu trúc thư mục:
     BTVN/
-      app.py                    ← Flask backend
-      audit.py                  ← Logic xử lý XLSX + ghi báo cáo
+      app.py                    ← Flask backend (4 routes: /, /api/demo,
+                                  /api/audit, /api/audit-ahrefs, /download)
+      audit.py                  ← Core logic: read XLSX, fetch Ahrefs API,
+                                  filter Black-Hat, write styled report
       templates/
-        index.html              ← Giao diện
+        index.html              ← Giao diện 1 trang + 2 tab nhập + showcase
       static/
         style.css               ← Theme vàng + Helvetica
-        script.js               ← Upload + gọi API
-      uploads/                  ← (runtime, không gồm trong export)
-      outputs/                  ← (runtime, không gồm trong export)
+        script.js               ← Drag-drop, Ahrefs form, render bảng, demo loader
+      requirements.txt          ← Flask + openpyxl + gunicorn
+      render.yaml               ← Render Blueprint deploy config
+      README.md
+      .gitignore
+      uploads/   outputs/       ← (runtime, gitignored)
 
-  Cách chạy lại từ đầu trên máy mới:
+  Tính năng:
+    1. Upload file XLSX backlinks → báo cáo Excel có style (DR coloring)
+    2. Lấy backlinks trực tiếp từ Ahrefs API v3 (nhập domain + API key)
+    3. Bảng preview inline ngay trên trang (tab Chi tiết / Domain)
+    4. Bảng demo mẫu (TGDĐ + Reno15) hiển thị sẵn ở cuối trang
+
+  Chạy lại từ đầu:
     1. cd vào thư mục BTVN
-    2. pip3 install flask openpyxl
+    2. pip3 install -r requirements.txt
     3. python3 app.py
     4. Mở http://127.0.0.1:5050
 ================================================================================
 
 
 ################################################################################
+# FILE: README.md
+# Hướng dẫn dự án
+################################################################################
+
+# BTVN — Backlink Audit Web App
+
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-btvn--2.onrender.com-F5C518?style=for-the-badge&logo=render&logoColor=black)](https://btvn-2.onrender.com)
+[![Python](https://img.shields.io/badge/Python-3.12-blue?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
+[![Flask](https://img.shields.io/badge/Flask-3.0-000000?style=for-the-badge&logo=flask&logoColor=white)](https://flask.palletsprojects.com/)
+
+## 👉 Xem ngay bản giao diện
+
+**https://btvn-2.onrender.com**
+
+> Lần đầu mở có thể mất ~30 giây vì Render free tier ngủ khi không có traffic. Lần sau nhanh ngay.
+
+---
+
+Công cụ web đơn giản: tải lên file backlinks Ahrefs (.xlsx), nhập từ khoá lọc, nhận về báo cáo Excel 2 sheet có style sẵn (đã loại Black Hat, tô màu theo Domain Rating).
+
+Theme vàng `#F5C518`, font Helvetica.
+
+## Chạy local
+
+```bash
+pip3 install -r requirements.txt
+python3 app.py
+```
+
+Mở http://127.0.0.1:5050
+
+## Cấu trúc
+
+```
+app.py                ← Flask backend (3 route)
+audit.py              ← Logic đọc XLSX + ghi báo cáo có style
+templates/index.html  ← Giao diện
+static/style.css      ← Theme vàng + Helvetica
+static/script.js      ← Upload drag-and-drop + gọi API
+```
+
+## File dữ liệu mẫu
+
+Đính kèm trong repo:
+
+- `www.thegioididong.com-backlinks-subdomains_*.xlsx` — file dữ liệu chính cần upload
+- `www.thegioididong.com-anchors-subdomains_*.xlsx` / `top-pages-*.xlsx` — file phụ trợ (không bắt buộc cho audit hiện tại)
+- `chi_tiet_anchor_backlink_reno15.xlsx` — file output mẫu (target format)
+- `BTVN_export.txt` — export gộp toàn bộ source code
+
+## Cách dùng
+
+App có **2 chế độ** chọn qua tab:
+
+### A. Upload file XLSX
+1. Tải lên file `…-backlinks-subdomains_*.xlsx`
+2. Nhập từ khoá Target URL (vd `reno15`)
+3. Nhập nhãn sản phẩm tuỳ chọn (vd `Reno15`)
+4. Bấm **Bắt đầu audit** → tải file Excel kết quả
+
+### B. Lấy từ Ahrefs API (không cần file)
+1. Nhập domain cần audit (vd `thegioididong.com`)
+2. Dán **Ahrefs API key** (lấy tại [app.ahrefs.com/api](https://app.ahrefs.com/api), cần plan Standard trở lên)
+3. Nhập từ khoá Target URL + nhãn sản phẩm
+4. Chọn phạm vi (mode) và số backlink tối đa (mặc định 1000 — càng cao càng tốn credit)
+5. Bấm **Gọi Ahrefs & audit** → app tự fetch & build báo cáo
+
+🔒 API key chỉ truyền 1 lần trong request, **không lưu trên server**.
+
+
+################################################################################
+# FILE: requirements.txt
+# Python deps
+################################################################################
+
+Flask>=3.0
+openpyxl>=3.1
+gunicorn>=21.2
+
+
+################################################################################
+# FILE: render.yaml
+# Render blueprint
+################################################################################
+
+services:
+  - type: web
+    name: btvn-2
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --timeout 120
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.4
+
+
+################################################################################
 # FILE: app.py
+# Flask backend — 4 routes
 ################################################################################
 
 """Flask web app: upload backlinks XLSX → download styled audit report."""
@@ -38,7 +152,7 @@ from flask import (Flask, abort, jsonify, render_template, request,
                    send_from_directory, url_for)
 from werkzeug.utils import secure_filename
 
-from audit import run_audit
+from audit import AhrefsAPIError, run_audit, run_audit_from_ahrefs
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -53,6 +167,15 @@ MAX_BYTES = 25 * 1024 * 1024  # 25 MB
 app = Flask(__name__, static_folder="static", template_folder="templates")
 app.config["MAX_CONTENT_LENGTH"] = MAX_BYTES
 
+# Bundled sample so visitors can preview the report format without uploading.
+DEMO_SAMPLE = BASE_DIR / (
+    "www.thegioididong.com-backlinks-subdomains_2026-05-09_02-31-21.xlsx"
+)
+DEMO_KEYWORD = "reno15"
+DEMO_LABEL = "Reno15"
+DEMO_FILENAME = "demo_reno15.xlsx"
+_demo_cache: dict | None = None
+
 
 def _safe_label(label: str) -> str:
     """Sanitize a label so it's safe as a filename token."""
@@ -63,6 +186,32 @@ def _safe_label(label: str) -> str:
 @app.route("/")
 def index():
     return render_template("index.html")
+
+
+@app.route("/api/demo")
+def demo_endpoint():
+    """Return a cached preview built from the bundled TGDĐ + Reno15 sample."""
+    global _demo_cache
+    if not DEMO_SAMPLE.exists():
+        return jsonify({"error": "File mẫu không có sẵn trên server."}), 404
+    if _demo_cache is None:
+        try:
+            result = run_audit(
+                str(DEMO_SAMPLE), DEMO_KEYWORD,
+                str(OUTPUT_DIR / DEMO_FILENAME),
+                product_label=DEMO_LABEL,
+            )
+        except Exception as exc:  # noqa: BLE001
+            return jsonify({"error": f"Lỗi tạo demo: {exc}"}), 500
+        preview = result.pop("preview", None)
+        _demo_cache = {"stats": result, "preview": preview}
+    return jsonify({
+        **_demo_cache,
+        "download_url": url_for("download_output", name=DEMO_FILENAME),
+        "filename": DEMO_FILENAME,
+        "source": "demo",
+        "demo": True,
+    })
 
 
 @app.route("/api/audit", methods=["POST"])
@@ -89,8 +238,8 @@ def audit_endpoint():
     out_path = OUTPUT_DIR / out_name
 
     try:
-        stats = run_audit(str(in_path), keyword, str(out_path),
-                          product_label=product_label)
+        result = run_audit(str(in_path), keyword, str(out_path),
+                           product_label=product_label)
     except Exception as exc:  # surface error to the UI
         try:
             in_path.unlink(missing_ok=True)
@@ -103,10 +252,65 @@ def audit_endpoint():
     except Exception:
         pass
 
+    preview = result.pop("preview", None)
     return jsonify({
-        "stats": stats,
+        "stats": result,
+        "preview": preview,
         "download_url": url_for("download_output", name=out_name),
         "filename": out_name,
+    })
+
+
+@app.route("/api/audit-ahrefs", methods=["POST"])
+def audit_ahrefs_endpoint():
+    payload = request.get_json(silent=True) or {}
+    domain = (payload.get("domain") or "").strip()
+    api_key = (payload.get("api_key") or "").strip()
+    keyword = (payload.get("keyword") or "").strip()
+    product_label = (payload.get("product_label") or keyword).strip()
+    try:
+        limit = int(payload.get("limit") or 1000)
+    except (TypeError, ValueError):
+        limit = 1000
+    limit = max(1, min(limit, 10000))
+    mode = (payload.get("mode") or "subdomains").strip().lower()
+    if mode not in {"subdomains", "domain", "exact", "prefix"}:
+        mode = "subdomains"
+
+    if not domain:
+        return jsonify({"error": "Bạn chưa nhập domain."}), 400
+    if not api_key:
+        return jsonify({"error": "Bạn chưa nhập Ahrefs API key."}), 400
+    if not keyword:
+        return jsonify({"error": "Bạn chưa nhập từ khoá lọc Target URL."}), 400
+
+    token = secrets.token_hex(8)
+    out_name = (
+        f"chi_tiet_anchor_backlink_{_safe_label(product_label)}__{token}.xlsx"
+    )
+    out_path = OUTPUT_DIR / out_name
+
+    try:
+        result = run_audit_from_ahrefs(
+            domain, api_key, keyword, str(out_path),
+            product_label=product_label, limit=limit, mode=mode,
+        )
+    except AhrefsAPIError as exc:
+        status = 502 if (exc.status or 0) >= 500 else 400
+        return jsonify({"error": str(exc)}), status
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except Exception as exc:  # noqa: BLE001 — surface unexpected errors to UI
+        return jsonify({"error": f"Xử lý thất bại: {exc}"}), 500
+
+    preview = result.pop("preview", None)
+    return jsonify({
+        "stats": result,
+        "preview": preview,
+        "download_url": url_for("download_output", name=out_name),
+        "filename": out_name,
+        "source": "ahrefs",
+        "domain": domain,
     })
 
 
@@ -128,6 +332,7 @@ if __name__ == "__main__":
 
 ################################################################################
 # FILE: audit.py
+# Audit core — XLSX read + Ahrefs API fetch + styled report
 ################################################################################
 
 """Backlink audit core logic.
@@ -137,7 +342,11 @@ styled two-sheet report similar to chi_tiet_anchor_backlink_reno15.xlsx.
 """
 from __future__ import annotations
 
+import json
 import re
+import urllib.error
+import urllib.parse
+import urllib.request
 from collections import defaultdict
 from datetime import date, datetime
 from typing import Iterable
@@ -146,6 +355,21 @@ from urllib.parse import urlparse
 import openpyxl
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
+
+
+AHREFS_BACKLINKS_ENDPOINT = "https://api.ahrefs.com/v3/site-explorer/all-backlinks"
+AHREFS_SELECT_FIELDS = (
+    "url_from,url_to,anchor,title,domain_rating_source,"
+    "first_seen_link,is_dofollow,is_spam"
+)
+
+
+class AhrefsAPIError(Exception):
+    """Raised when the Ahrefs API returns an error response."""
+
+    def __init__(self, message: str, status: int | None = None):
+        super().__init__(message)
+        self.status = status
 
 
 # --- Styling constants (matches the reno15 reference workbook) ---------------
@@ -257,6 +481,87 @@ def read_backlinks(path: str) -> list[dict]:
         records.append(record)
     wb.close()
     return records
+
+
+def fetch_from_ahrefs(domain: str, api_key: str,
+                      mode: str = "subdomains",
+                      limit: int = 1000,
+                      history: str = "all_time",
+                      timeout: int = 60) -> list[dict]:
+    """Fetch backlinks via Ahrefs API v3 and map fields to XLSX-style keys.
+
+    Returns rows with the same keys read_backlinks() produces, so the rest of
+    the audit pipeline can consume them unchanged.
+    """
+    target = (domain or "").strip()
+    if not target:
+        raise ValueError("Domain trống.")
+    if not (api_key or "").strip():
+        raise ValueError("API key trống.")
+
+    # Strip scheme / trailing slash so people can paste either form.
+    if "://" in target:
+        target = urlparse(target).netloc or target
+    target = target.strip("/")
+
+    params = {
+        "target": target,
+        "mode": mode,
+        "protocol": "both",
+        "select": AHREFS_SELECT_FIELDS,
+        "limit": str(int(limit)),
+        "history": history,
+        "output": "json",
+    }
+    url = f"{AHREFS_BACKLINKS_ENDPOINT}?{urllib.parse.urlencode(params)}"
+    req = urllib.request.Request(url, headers={
+        "Authorization": f"Bearer {api_key.strip()}",
+        "Accept": "application/json",
+    })
+
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            body = resp.read().decode("utf-8", errors="replace")
+    except urllib.error.HTTPError as exc:
+        detail = ""
+        try:
+            detail = exc.read().decode("utf-8", errors="replace")[:400]
+        except Exception:
+            pass
+        if exc.code == 401:
+            raise AhrefsAPIError(
+                "API key không hợp lệ hoặc đã hết hạn (HTTP 401).", 401)
+        if exc.code == 403:
+            raise AhrefsAPIError(
+                "Subscription của bạn không có quyền dùng endpoint này "
+                "(HTTP 403). Cần plan Standard trở lên.", 403)
+        if exc.code == 429:
+            raise AhrefsAPIError(
+                "Đã vượt rate limit của Ahrefs API (HTTP 429). Thử lại sau.",
+                429)
+        raise AhrefsAPIError(
+            f"Ahrefs API trả lỗi HTTP {exc.code}: {detail}", exc.code)
+    except urllib.error.URLError as exc:
+        raise AhrefsAPIError(f"Không kết nối được Ahrefs API: {exc.reason}")
+
+    try:
+        data = json.loads(body)
+    except json.JSONDecodeError:
+        raise AhrefsAPIError("Ahrefs trả về response không phải JSON.")
+
+    raw_rows = data.get("backlinks") or []
+    rows: list[dict] = []
+    for r in raw_rows:
+        rows.append({
+            "Target URL": r.get("url_to") or "",
+            "Anchor": r.get("anchor") or "",
+            "Referring page URL": r.get("url_from") or "",
+            "Referring page title": r.get("title") or "",
+            "Domain rating": r.get("domain_rating_source"),
+            "First seen": r.get("first_seen_link") or "",
+            "Is spam": str(r.get("is_spam", "")).lower(),
+        })
+    return rows
 
 
 # --- Audit pipeline ----------------------------------------------------------
@@ -463,15 +768,13 @@ def _write_summary_sheet(ws, summary: dict[str, list[dict]], product_label: str)
     ws.freeze_panes = "A4"
 
 
-def run_audit(backlinks_path: str, keyword: str, output_path: str,
-              product_label: str | None = None) -> dict:
-    """Run the full audit and write the styled workbook to output_path.
+def _build_report(rows: list[dict], keyword: str, output_path: str,
+                  product_label: str | None) -> dict:
+    """Filter, group, and write the styled workbook. Shared by both audit modes.
 
-    Returns a small stats dict for the UI.
+    Returns a dict with both `stats` and `preview` so the UI can render a
+    table inline (preview) and still offer the .xlsx download.
     """
-    rows = read_backlinks(backlinks_path)
-    if not rows:
-        raise ValueError("Không đọc được dữ liệu từ file backlinks.")
     kept = filter_rows(rows, keyword)
     detail = build_detail(kept)
     summary = build_domain_summary(detail)
@@ -490,17 +793,84 @@ def run_audit(backlinks_path: str, keyword: str, output_path: str,
 
     total_links = sum(len(v) for v in detail.values())
     total_domains = sum(len(v) for v in summary.values())
+
+    detail_preview = [
+        {
+            "target": target,
+            "target_path": _path_of(target),
+            "count": len(items),
+            "rows": [
+                {
+                    "stt": i + 1,
+                    "anchor": it["anchor"],
+                    "ref_url": it["ref_url"],
+                    "dr": it["dr"],
+                    "first_seen": it["first_seen"],
+                }
+                for i, it in enumerate(items)
+            ],
+        }
+        for target, items in detail.items()
+    ]
+    summary_preview = [
+        {
+            "target": target,
+            "target_path": _path_of(target),
+            "total_links": sum(it["count"] for it in items),
+            "domain_count": len(items),
+            "rows": [
+                {
+                    "stt": i + 1,
+                    "domain": it["domain"],
+                    "count": it["count"],
+                    "dr_max": it["dr_max"],
+                }
+                for i, it in enumerate(items)
+            ],
+        }
+        for target, items in summary.items()
+    ]
+
     return {
         "input_rows": len(rows),
         "kept_rows": len(kept),
         "target_urls": len(detail),
         "total_links": total_links,
         "total_domain_rows": total_domains,
+        "preview": {
+            "detail": detail_preview,
+            "summary": summary_preview,
+        },
     }
+
+
+def run_audit(backlinks_path: str, keyword: str, output_path: str,
+              product_label: str | None = None) -> dict:
+    """Run the full audit from a local XLSX file."""
+    rows = read_backlinks(backlinks_path)
+    if not rows:
+        raise ValueError("Không đọc được dữ liệu từ file backlinks.")
+    return _build_report(rows, keyword, output_path, product_label)
+
+
+def run_audit_from_ahrefs(domain: str, api_key: str, keyword: str,
+                          output_path: str,
+                          product_label: str | None = None,
+                          limit: int = 1000,
+                          mode: str = "subdomains") -> dict:
+    """Fetch backlinks via Ahrefs API, then build the styled report."""
+    rows = fetch_from_ahrefs(domain, api_key, mode=mode, limit=limit)
+    if not rows:
+        raise ValueError(
+            "Ahrefs không trả về backlink nào cho domain này "
+            "(kiểm tra lại domain hoặc subscription)."
+        )
+    return _build_report(rows, keyword, output_path, product_label)
 
 
 ################################################################################
 # FILE: templates/index.html
+# Giao diện
 ################################################################################
 
 <!doctype html>
@@ -524,44 +894,127 @@ def run_audit(backlinks_path: str, keyword: str, output_path: str,
     <section class="hero">
       <h1>Audit backlink từ file dữ liệu của bạn</h1>
       <p>Tải lên file <strong>Ahrefs backlinks (.xlsx)</strong>, nhập từ khoá Target URL (ví dụ <em>reno15</em>), nhận về file báo cáo có 2 sheet đã chia nhóm, tô màu theo Domain Rating.</p>
+      <p class="hero-hint">👇 Cuộn xuống cuối trang để xem <a href="#demo-showcase">bảng kết quả mẫu</a> trước khi upload.</p>
     </section>
 
-    <form id="audit-form" class="card">
-      <div class="field">
-        <label for="backlinks">1. File backlinks (.xlsx)</label>
-        <div class="drop" id="drop">
-          <input type="file" name="backlinks" id="backlinks" accept=".xlsx" required hidden />
-          <div class="drop-inner">
-            <span class="drop-icon">⤓</span>
-            <span class="drop-text">Kéo thả file vào đây hoặc <button type="button" id="pick-btn" class="link-btn">chọn file</button></span>
-            <span class="drop-hint" id="drop-hint">Hỗ trợ <code>www....-backlinks-subdomains_*.xlsx</code> · tối đa 25 MB</span>
+    <div class="card">
+      <div class="tabs" role="tablist">
+        <button type="button" class="tab active" data-tab="upload" role="tab">📁 Upload file XLSX</button>
+        <button type="button" class="tab" data-tab="ahrefs" role="tab">🔗 Lấy từ Ahrefs API</button>
+      </div>
+
+      <form id="audit-form" class="tab-panel active" data-tab="upload">
+        <div class="field">
+          <label for="backlinks">1. File backlinks (.xlsx)</label>
+          <div class="drop" id="drop">
+            <input type="file" name="backlinks" id="backlinks" accept=".xlsx" required hidden />
+            <div class="drop-inner">
+              <span class="drop-icon">⤓</span>
+              <span class="drop-text">Kéo thả file vào đây hoặc <button type="button" id="pick-btn" class="link-btn">chọn file</button></span>
+              <span class="drop-hint" id="drop-hint">Hỗ trợ <code>www....-backlinks-subdomains_*.xlsx</code> · tối đa 25 MB</span>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div class="row">
-        <div class="field">
-          <label for="keyword">2. Từ khoá Target URL</label>
-          <input type="text" name="keyword" id="keyword" placeholder="vd: reno15" required />
-          <small>Chỉ giữ các backlink có Target URL chứa chuỗi này.</small>
+        <div class="row">
+          <div class="field">
+            <label for="keyword">2. Từ khoá Target URL</label>
+            <input type="text" name="keyword" id="keyword" placeholder="vd: reno15" required />
+            <small>Chỉ giữ các backlink có Target URL chứa chuỗi này.</small>
+          </div>
+          <div class="field">
+            <label for="product_label">3. Nhãn sản phẩm (tuỳ chọn)</label>
+            <input type="text" name="product_label" id="product_label" placeholder="vd: Reno15" />
+            <small>Dùng cho tiêu đề báo cáo & tên file.</small>
+          </div>
         </div>
-        <div class="field">
-          <label for="product_label">3. Nhãn sản phẩm (tuỳ chọn)</label>
-          <input type="text" name="product_label" id="product_label" placeholder="vd: Reno15" />
-          <small>Dùng cho tiêu đề báo cáo & tên file. Để trống sẽ lấy theo từ khoá.</small>
-        </div>
-      </div>
 
-      <div class="actions">
-        <button type="submit" id="submit-btn" class="primary">Bắt đầu audit</button>
-        <span id="status" class="status" aria-live="polite"></span>
-      </div>
-    </form>
+        <div class="actions">
+          <button type="submit" id="submit-btn" class="primary">Bắt đầu audit</button>
+          <span id="status" class="status" aria-live="polite"></span>
+        </div>
+      </form>
+
+      <form id="ahrefs-form" class="tab-panel" data-tab="ahrefs">
+        <div class="field">
+          <label for="ahrefs-domain">1. Domain cần audit</label>
+          <input type="text" name="domain" id="ahrefs-domain" placeholder="vd: thegioididong.com" required />
+          <small>Nhập domain gốc, không cần <code>https://</code>. Ahrefs sẽ quét cả subdomain mặc định.</small>
+        </div>
+
+        <div class="field">
+          <label for="ahrefs-key">2. Ahrefs API key</label>
+          <input type="password" name="api_key" id="ahrefs-key" placeholder="dán API token Ahrefs..." required autocomplete="off" />
+          <small>🔒 Key chỉ truyền 1 lần để gọi API, <strong>không lưu trên server</strong>. Lấy key tại <a href="https://app.ahrefs.com/api" target="_blank" rel="noopener">app.ahrefs.com/api</a>.</small>
+        </div>
+
+        <div class="row">
+          <div class="field">
+            <label for="ahrefs-keyword">3. Từ khoá Target URL</label>
+            <input type="text" name="keyword" id="ahrefs-keyword" placeholder="vd: reno15" required />
+            <small>Chỉ giữ backlink có Target chứa chuỗi này.</small>
+          </div>
+          <div class="field">
+            <label for="ahrefs-label">4. Nhãn sản phẩm (tuỳ chọn)</label>
+            <input type="text" name="product_label" id="ahrefs-label" placeholder="vd: Reno15" />
+            <small>Dùng cho tiêu đề báo cáo.</small>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="field">
+            <label for="ahrefs-mode">5. Phạm vi (mode)</label>
+            <select name="mode" id="ahrefs-mode">
+              <option value="subdomains" selected>subdomains (toàn site + sub)</option>
+              <option value="domain">domain (chỉ domain chính)</option>
+              <option value="prefix">prefix (URL bắt đầu bằng)</option>
+              <option value="exact">exact (URL chính xác)</option>
+            </select>
+            <small>Mặc định <code>subdomains</code> giống file XLSX export.</small>
+          </div>
+          <div class="field">
+            <label for="ahrefs-limit">6. Số backlink tối đa</label>
+            <input type="number" name="limit" id="ahrefs-limit" min="1" max="10000" value="1000" />
+            <small>⚠️ Càng nhiều càng tốn credit Ahrefs. Mặc định 1000.</small>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button type="submit" id="ahrefs-submit" class="primary">Gọi Ahrefs &amp; audit</button>
+          <span id="ahrefs-status" class="status" aria-live="polite"></span>
+        </div>
+      </form>
+    </div>
 
     <section id="result" class="card result hidden">
-      <h2>Kết quả</h2>
+      <div class="result-head">
+        <h2 id="result-title">Kết quả</h2>
+        <a id="download-link" class="primary download" href="#" download>⇩ Tải báo cáo Excel</a>
+      </div>
       <div class="stats" id="stats"></div>
-      <a id="download-link" class="primary download" href="#" download>⇩ Tải báo cáo Excel</a>
+
+      <div class="tabs result-tabs" role="tablist">
+        <button type="button" class="tab active" data-result-tab="detail" role="tab">📋 Chi tiết URL vs Anchor</button>
+        <button type="button" class="tab" data-result-tab="summary" role="tab">📊 Domain vs URL</button>
+      </div>
+
+      <div class="result-panel active" data-result-tab="detail">
+        <div class="legend">
+          <span class="swatch hi"></span> DR ≥ 50 (chất lượng cao)
+          <span class="legend-sep">·</span>
+          <span class="swatch mid"></span> DR 20–49
+        </div>
+        <div id="detail-table" class="preview-table"></div>
+      </div>
+
+      <div class="result-panel" data-result-tab="summary">
+        <div class="legend">
+          <span class="swatch hi"></span> DR ≥ 50
+          <span class="legend-sep">·</span>
+          <span class="swatch mid"></span> DR 20–49
+        </div>
+        <div id="summary-table" class="preview-table"></div>
+      </div>
     </section>
 
     <section class="card guide">
@@ -570,6 +1023,41 @@ def run_audit(backlinks_path: str, keyword: str, output_path: str,
         <li><strong>Sheet 1 — Chi Tiết URL vs Anchor:</strong> liệt kê từng backlink theo Target URL, đã loại bỏ Black Hat. Dòng có DR ≥ 50 tô <span class="swatch hi"></span> xanh lá.</li>
         <li><strong>Sheet 2 — 📊 Domain vs URL:</strong> đếm số link & DR cao nhất theo domain nguồn. DR ≥ 50 tô <span class="swatch hi"></span>, DR 20–49 tô <span class="swatch mid"></span> vàng.</li>
       </ul>
+    </section>
+
+    <section id="demo-showcase" class="card showcase">
+      <div class="result-head">
+        <div>
+          <h2>📋 Bảng kết quả mẫu</h2>
+          <p class="showcase-desc">Audit chạy sẵn trên dữ liệu backlinks <strong>thegioididong.com</strong> lọc theo <code>reno15</code>. Khi bạn upload file riêng phía trên, kết quả sẽ trông tương tự nhưng với dữ liệu của bạn.</p>
+        </div>
+        <a id="demo-download" class="primary outline download" href="#" download>⇩ Tải file mẫu</a>
+      </div>
+      <div class="stats" id="demo-stats">
+        <div class="preview-empty">Đang tải dữ liệu mẫu…</div>
+      </div>
+
+      <div class="tabs result-tabs" role="tablist">
+        <button type="button" class="tab active" data-demo-tab="detail" role="tab">📋 Chi tiết URL vs Anchor</button>
+        <button type="button" class="tab" data-demo-tab="summary" role="tab">📊 Domain vs URL</button>
+      </div>
+
+      <div class="result-panel active" data-demo-tab="detail">
+        <div class="legend">
+          <span class="swatch hi"></span> DR ≥ 50
+          <span class="legend-sep">·</span>
+          <span class="swatch mid"></span> DR 20–49
+        </div>
+        <div id="demo-detail-table" class="preview-table"></div>
+      </div>
+      <div class="result-panel" data-demo-tab="summary">
+        <div class="legend">
+          <span class="swatch hi"></span> DR ≥ 50
+          <span class="legend-sep">·</span>
+          <span class="swatch mid"></span> DR 20–49
+        </div>
+        <div id="demo-summary-table" class="preview-table"></div>
+      </div>
     </section>
   </main>
 
@@ -584,6 +1072,7 @@ def run_audit(backlinks_path: str, keyword: str, output_path: str,
 
 ################################################################################
 # FILE: static/style.css
+# Theme vàng + Helvetica
 ################################################################################
 
 /* ===== Backlink Audit — Yellow + Helvetica =============================== */
@@ -660,6 +1149,44 @@ main {
   line-height: 1.25;
 }
 .hero p { margin: 0; color: var(--ink-soft); }
+.hero-hint {
+  font-size: 13px;
+  color: var(--ink-soft);
+  margin-top: 12px;
+}
+.hero-hint a {
+  color: var(--ink);
+  font-weight: 700;
+  border-bottom: 2px solid var(--yellow);
+  text-decoration: none;
+}
+.hero-hint a:hover { border-bottom-color: var(--yellow-deep); }
+
+.primary.outline {
+  background: #fff;
+  color: var(--ink);
+  border: 2px solid var(--yellow-deep);
+}
+.primary.outline:hover:not(:disabled) {
+  background: var(--yellow-soft);
+}
+
+.showcase {
+  border-left: 6px solid var(--yellow-deep);
+  background: #FFFEF7;
+}
+.showcase-desc {
+  margin: 6px 0 0;
+  color: var(--ink-soft);
+  font-size: 13px;
+  max-width: 580px;
+}
+.showcase-desc code {
+  background: #fff;
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+}
 
 .card {
   background: var(--card);
@@ -670,12 +1197,46 @@ main {
 }
 .card h2 { margin: 0 0 12px; font-size: 18px; }
 
+/* ---- Tabs --------------------------------------------------------------- */
+.tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 2px solid var(--border);
+  margin: -8px -8px 20px;
+  padding: 0 8px;
+}
+.tab {
+  background: transparent;
+  border: none;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink-soft);
+  padding: 10px 16px;
+  cursor: pointer;
+  border-radius: 8px 8px 0 0;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.tab:hover { color: var(--ink); background: var(--yellow-soft); }
+.tab.active {
+  color: var(--ink);
+  border-bottom-color: var(--yellow);
+  background: var(--yellow-soft);
+}
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
 /* ---- Form -------------------------------------------------------------- */
 .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
 .field label { font-weight: 700; font-size: 14px; }
 .field small { color: var(--ink-soft); font-size: 12px; }
 
-input[type="text"] {
+input[type="text"],
+input[type="password"],
+input[type="number"],
+select {
   font-family: inherit;
   font-size: 15px;
   padding: 10px 12px;
@@ -685,10 +1246,15 @@ input[type="text"] {
   outline: none;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
-input[type="text"]:focus {
+input[type="text"]:focus,
+input[type="password"]:focus,
+input[type="number"]:focus,
+select:focus {
   border-color: var(--yellow-deep);
   box-shadow: 0 0 0 3px var(--yellow-soft);
 }
+.field small a { color: var(--ink); font-weight: 700; }
+.field small a:hover { color: var(--yellow-deep); }
 
 .row {
   display: grid;
@@ -756,6 +1322,15 @@ input[type="text"]:focus {
 /* ---- Result ------------------------------------------------------------ */
 .hidden { display: none !important; }
 .result { border-left: 6px solid var(--yellow); }
+.result-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.result-head h2 { margin: 0; }
 .stats {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -770,7 +1345,102 @@ input[type="text"]:focus {
 }
 .stat .label { font-size: 12px; color: var(--ink-soft); }
 .stat .value { font-size: 22px; font-weight: 700; }
-.download { font-size: 16px; padding: 14px 24px; }
+.download { font-size: 15px; padding: 12px 20px; }
+
+.result-tabs { margin: 8px -8px 12px; }
+.result-panel { display: none; }
+.result-panel.active { display: block; }
+
+.legend {
+  font-size: 12px;
+  color: var(--ink-soft);
+  margin-bottom: 10px;
+}
+.legend-sep { margin: 0 8px; color: var(--border); }
+
+.preview-table {
+  max-height: 600px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+}
+.preview-group { border-top: 1px solid var(--border); }
+.preview-group:first-child { border-top: none; }
+.preview-group-head {
+  background: #2E75B6;
+  color: #fff;
+  font-weight: 700;
+  padding: 10px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.preview-group-head .chev {
+  display: inline-block;
+  transition: transform 0.15s;
+  font-size: 12px;
+}
+.preview-group.collapsed .chev { transform: rotate(-90deg); }
+.preview-group.collapsed table { display: none; }
+.preview-group-head .count {
+  margin-left: auto;
+  font-weight: 400;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.18);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.preview-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.preview-table th,
+.preview-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+.preview-table th {
+  background: #F4F4F4;
+  font-weight: 700;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  position: sticky;
+  top: 41px;
+  z-index: 0;
+}
+.preview-table td.num,
+.preview-table th.num { text-align: center; width: 50px; }
+.preview-table td.dr,
+.preview-table th.dr { text-align: center; width: 70px; font-weight: 700; }
+.preview-table td.date,
+.preview-table th.date { width: 100px; text-align: center; color: var(--ink-soft); }
+.preview-table td.url a {
+  color: #1B5DAA;
+  word-break: break-all;
+  text-decoration: none;
+}
+.preview-table td.url a:hover { text-decoration: underline; }
+.preview-table tr.dr-high { background: #E2EFDA; }
+.preview-table tr.dr-mid { background: #FFF2CC; }
+.preview-table tr.dr-zebra { background: #F2F7FB; }
+.preview-empty {
+  padding: 24px;
+  text-align: center;
+  color: var(--ink-soft);
+  font-style: italic;
+}
 
 /* ---- Guide ------------------------------------------------------------- */
 .guide ul { margin: 0; padding-left: 18px; }
@@ -796,6 +1466,7 @@ input[type="text"]:focus {
 
 ################################################################################
 # FILE: static/script.js
+# Upload/Ahrefs/Demo + render bảng preview
 ################################################################################
 
 (function () {
@@ -896,26 +1567,266 @@ input[type="text"]:focus {
     }
   });
 
-  function renderResult(data) {
-    const s = data.stats || {};
+  function escapeHTML(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;",
+               '"': "&quot;", "'": "&#39;" })[c];
+    });
+  }
+
+  function drClass(dr) {
+    const n = Number(dr) || 0;
+    if (n >= 50) return "dr-high";
+    if (n >= 20) return "dr-mid";
+    return "";
+  }
+
+  function formatDR(dr) {
+    if (dr == null || dr === "") return "—";
+    const n = Number(dr);
+    if (Number.isNaN(n)) return String(dr);
+    return Number.isInteger(n) ? String(n) : n.toFixed(1);
+  }
+
+  function renderDetailTable(detail, hostId) {
+    const host = document.getElementById(hostId || "detail-table");
+    if (!detail || !detail.length) {
+      host.innerHTML = '<div class="preview-empty">Không có backlink chất lượng phù hợp.</div>';
+      return;
+    }
+    const html = detail.map(function (g) {
+      const rows = g.rows.map(function (r, i) {
+        const cls = drClass(r.dr) || (i % 2 === 1 ? "dr-zebra" : "");
+        const refHost = (function () {
+          try { return new URL(r.ref_url).host.replace(/^www\./, ""); }
+          catch (e) { return r.ref_url; }
+        })();
+        return '<tr class="' + cls + '">' +
+          '<td class="num">' + r.stt + '</td>' +
+          '<td>' + escapeHTML(r.anchor) + '</td>' +
+          '<td class="url"><a href="' + escapeHTML(r.ref_url) +
+            '" target="_blank" rel="noopener" title="' + escapeHTML(r.ref_url) +
+            '">' + escapeHTML(refHost) + '</a></td>' +
+          '<td class="dr">' + formatDR(r.dr) + '</td>' +
+          '<td class="date">' + escapeHTML(r.first_seen) + '</td>' +
+          '</tr>';
+      }).join("");
+      return '<div class="preview-group">' +
+        '<div class="preview-group-head"><span class="chev">▼</span>' +
+        '<span>📌 ' + escapeHTML(g.target) + '</span>' +
+        '<span class="count">' + g.count + ' backlink</span></div>' +
+        '<table><thead><tr>' +
+          '<th class="num">STT</th><th>Anchor Text</th>' +
+          '<th>URL nguồn</th><th class="dr">DR</th>' +
+          '<th class="date">Ngày</th>' +
+        '</tr></thead><tbody>' + rows + '</tbody></table>' +
+        '</div>';
+    }).join("");
+    host.innerHTML = html;
+  }
+
+  function renderSummaryTable(summary, hostId) {
+    const host = document.getElementById(hostId || "summary-table");
+    if (!summary || !summary.length) {
+      host.innerHTML = '<div class="preview-empty">Không có dữ liệu tổng hợp.</div>';
+      return;
+    }
+    const html = summary.map(function (g) {
+      const rows = g.rows.map(function (r, i) {
+        const cls = drClass(r.dr_max) || (i % 2 === 1 ? "dr-zebra" : "");
+        return '<tr class="' + cls + '">' +
+          '<td class="num">' + r.stt + '</td>' +
+          '<td>' + escapeHTML(r.domain) + '</td>' +
+          '<td class="dr">' + r.count + '</td>' +
+          '<td class="dr">' + formatDR(r.dr_max) + '</td>' +
+          '</tr>';
+      }).join("");
+      return '<div class="preview-group">' +
+        '<div class="preview-group-head"><span class="chev">▼</span>' +
+        '<span>📌 ' + escapeHTML(g.target_path) + '</span>' +
+        '<span class="count">' + g.total_links + ' link / ' +
+        g.domain_count + ' domain</span></div>' +
+        '<table><thead><tr>' +
+          '<th class="num">STT</th><th>Domain nguồn</th>' +
+          '<th class="dr">Số link</th><th class="dr">DR (max)</th>' +
+        '</tr></thead><tbody>' + rows + '</tbody></table>' +
+        '</div>';
+    }).join("");
+    host.innerHTML = html;
+  }
+
+  // Collapse/expand group headers (event-delegated, works for both panels).
+  document.addEventListener("click", function (e) {
+    const head = e.target.closest(".preview-group-head");
+    if (head) head.parentElement.classList.toggle("collapsed");
+  });
+
+  // Tab switching for any group of .result-tabs — works for both the user's
+  // result section and the demo showcase by scoping selectors to the parent.
+  document.querySelectorAll(".result-tabs").forEach(function (group) {
+    const scope = group.parentElement;
+    const attr = group.querySelector(".tab[data-demo-tab]")
+      ? "data-demo-tab" : "data-result-tab";
+    group.querySelectorAll(".tab").forEach(function (tab) {
+      tab.addEventListener("click", function () {
+        const name = tab.getAttribute(attr);
+        group.querySelectorAll(".tab").forEach(function (t) {
+          t.classList.toggle("active", t === tab);
+        });
+        scope.querySelectorAll(".result-panel").forEach(function (p) {
+          p.classList.toggle("active", p.getAttribute(attr) === name);
+        });
+      });
+    });
+  });
+
+  function buildStatsHTML(stats, inputLabel) {
     const items = [
-      ["Dòng đầu vào", s.input_rows],
-      ["Backlink chất lượng", s.kept_rows],
-      ["Target URL", s.target_urls],
-      ["Tổng link giữ lại", s.total_links],
-      ["Dòng tổng hợp domain", s.total_domain_rows],
+      [inputLabel, stats.input_rows],
+      ["Backlink chất lượng", stats.kept_rows],
+      ["Target URL", stats.target_urls],
+      ["Tổng link giữ lại", stats.total_links],
+      ["Dòng tổng hợp domain", stats.total_domain_rows],
     ];
-    statsEl.innerHTML = items.map(function (it) {
+    return items.map(function (it) {
       return '<div class="stat"><div class="label">' + it[0] +
              '</div><div class="value">' + (it[1] != null ? it[1] : "—") +
              "</div></div>";
     }).join("");
+  }
+
+  function renderResult(data) {
+    const s = data.stats || {};
+    const inputLabel = data.source === "ahrefs"
+      ? "Backlink từ Ahrefs" : "Dòng đầu vào";
+    statsEl.innerHTML = buildStatsHTML(s, inputLabel);
     downloadLink.href = data.download_url;
     downloadLink.setAttribute("download", data.filename || "audit.xlsx");
+
+    const preview = data.preview || {};
+    renderDetailTable(preview.detail || [], "detail-table");
+    renderSummaryTable(preview.summary || [], "summary-table");
+
     resultCard.classList.remove("hidden");
     resultCard.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
+
+  // --- Tab switching ---
+  const tabs = document.querySelectorAll(".tab");
+  const panels = document.querySelectorAll(".tab-panel");
+  tabs.forEach(function (tab) {
+    tab.addEventListener("click", function () {
+      const name = tab.getAttribute("data-tab");
+      tabs.forEach(function (t) { t.classList.toggle("active", t === tab); });
+      panels.forEach(function (p) {
+        p.classList.toggle("active", p.getAttribute("data-tab") === name);
+      });
+    });
+  });
+
+  // --- Ahrefs form ---
+  const ahrefsForm = document.getElementById("ahrefs-form");
+  const ahrefsSubmit = document.getElementById("ahrefs-submit");
+  const ahrefsStatus = document.getElementById("ahrefs-status");
+
+  function setAhrefsStatus(text, kind) {
+    ahrefsStatus.textContent = text || "";
+    ahrefsStatus.className = "status" + (kind ? " " + kind : "");
+  }
+
+  // --- Demo showcase (auto-loads bundled TGDĐ + Reno15 sample on page open) ---
+  async function loadDemoShowcase() {
+    const statsHost = document.getElementById("demo-stats");
+    try {
+      const res = await fetch("/api/demo");
+      const data = await res.json().catch(function () { return {}; });
+      if (!res.ok) {
+        statsHost.innerHTML =
+          '<div class="preview-empty">Không tải được dữ liệu mẫu: ' +
+          escapeHTML(data.error || res.status) + "</div>";
+        return;
+      }
+      statsHost.innerHTML = buildStatsHTML(data.stats || {}, "Dòng đầu vào");
+      const dl = document.getElementById("demo-download");
+      dl.href = data.download_url;
+      dl.setAttribute("download", data.filename || "demo.xlsx");
+      const preview = data.preview || {};
+      renderDetailTable(preview.detail || [], "demo-detail-table");
+      renderSummaryTable(preview.summary || [], "demo-summary-table");
+    } catch (err) {
+      statsHost.innerHTML =
+        '<div class="preview-empty">Lỗi mạng khi tải mẫu: ' +
+        escapeHTML(err.message) + "</div>";
+    }
+  }
+  loadDemoShowcase();
+
+  ahrefsForm.addEventListener("submit", async function (e) {
+    e.preventDefault();
+    resultCard.classList.add("hidden");
+
+    const payload = {
+      domain: document.getElementById("ahrefs-domain").value.trim(),
+      api_key: document.getElementById("ahrefs-key").value.trim(),
+      keyword: document.getElementById("ahrefs-keyword").value.trim(),
+      product_label: document.getElementById("ahrefs-label").value.trim(),
+      mode: document.getElementById("ahrefs-mode").value,
+      limit: parseInt(document.getElementById("ahrefs-limit").value, 10) || 1000,
+    };
+
+    if (!payload.domain || !payload.api_key || !payload.keyword) {
+      setAhrefsStatus("Vui lòng nhập đủ domain, API key và từ khoá.", "err");
+      return;
+    }
+
+    ahrefsSubmit.disabled = true;
+    setAhrefsStatus("Đang gọi Ahrefs API…", "working");
+
+    try {
+      const res = await fetch("/api/audit-ahrefs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(function () { return {}; });
+      if (!res.ok) {
+        setAhrefsStatus(data.error || ("Lỗi (" + res.status + ")"), "err");
+        return;
+      }
+      renderResult(data);
+      setAhrefsStatus("Hoàn tất ✓ " + (data.domain || ""), "ok");
+    } catch (err) {
+      setAhrefsStatus("Lỗi mạng: " + err.message, "err");
+    } finally {
+      ahrefsSubmit.disabled = false;
+    }
+  });
 })();
+
+
+################################################################################
+# FILE: .gitignore
+# Ignore runtime dirs
+################################################################################
+
+# Runtime data — never commit user uploads or generated reports
+uploads/
+outputs/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# Logs
+*.log
 
 
 ################################################################################
