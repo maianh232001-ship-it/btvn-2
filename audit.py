@@ -433,7 +433,11 @@ def _write_summary_sheet(ws, summary: dict[str, list[dict]], product_label: str)
 
 def _build_report(rows: list[dict], keyword: str, output_path: str,
                   product_label: str | None) -> dict:
-    """Filter, group, and write the styled workbook. Shared by both audit modes."""
+    """Filter, group, and write the styled workbook. Shared by both audit modes.
+
+    Returns a dict with both `stats` and `preview` so the UI can render a
+    table inline (preview) and still offer the .xlsx download.
+    """
     kept = filter_rows(rows, keyword)
     detail = build_detail(kept)
     summary = build_domain_summary(detail)
@@ -452,12 +456,54 @@ def _build_report(rows: list[dict], keyword: str, output_path: str,
 
     total_links = sum(len(v) for v in detail.values())
     total_domains = sum(len(v) for v in summary.values())
+
+    detail_preview = [
+        {
+            "target": target,
+            "target_path": _path_of(target),
+            "count": len(items),
+            "rows": [
+                {
+                    "stt": i + 1,
+                    "anchor": it["anchor"],
+                    "ref_url": it["ref_url"],
+                    "dr": it["dr"],
+                    "first_seen": it["first_seen"],
+                }
+                for i, it in enumerate(items)
+            ],
+        }
+        for target, items in detail.items()
+    ]
+    summary_preview = [
+        {
+            "target": target,
+            "target_path": _path_of(target),
+            "total_links": sum(it["count"] for it in items),
+            "domain_count": len(items),
+            "rows": [
+                {
+                    "stt": i + 1,
+                    "domain": it["domain"],
+                    "count": it["count"],
+                    "dr_max": it["dr_max"],
+                }
+                for i, it in enumerate(items)
+            ],
+        }
+        for target, items in summary.items()
+    ]
+
     return {
         "input_rows": len(rows),
         "kept_rows": len(kept),
         "target_urls": len(detail),
         "total_links": total_links,
         "total_domain_rows": total_domains,
+        "preview": {
+            "detail": detail_preview,
+            "summary": summary_preview,
+        },
     }
 
 

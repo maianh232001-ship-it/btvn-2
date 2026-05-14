@@ -111,9 +111,34 @@
     </div>
 
     <section id="result" class="card result hidden">
-      <h2>Kết quả</h2>
+      <div class="result-head">
+        <h2>Kết quả</h2>
+        <a id="download-link" class="primary download" href="#" download>⇩ Tải báo cáo Excel</a>
+      </div>
       <div class="stats" id="stats"></div>
-      <a id="download-link" class="primary download" href="#" download>⇩ Tải báo cáo Excel</a>
+
+      <div class="tabs result-tabs" role="tablist">
+        <button type="button" class="tab active" data-result-tab="detail" role="tab">📋 Chi tiết URL vs Anchor</button>
+        <button type="button" class="tab" data-result-tab="summary" role="tab">📊 Domain vs URL</button>
+      </div>
+
+      <div class="result-panel active" data-result-tab="detail">
+        <div class="legend">
+          <span class="swatch hi"></span> DR ≥ 50 (chất lượng cao)
+          <span class="legend-sep">·</span>
+          <span class="swatch mid"></span> DR 20–49
+        </div>
+        <div id="detail-table" class="preview-table"></div>
+      </div>
+
+      <div class="result-panel" data-result-tab="summary">
+        <div class="legend">
+          <span class="swatch hi"></span> DR ≥ 50
+          <span class="legend-sep">·</span>
+          <span class="swatch mid"></span> DR 20–49
+        </div>
+        <div id="summary-table" class="preview-table"></div>
+      </div>
     </section>
 
     <section class="card guide">

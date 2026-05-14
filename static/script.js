@@ -96,6 +96,114 @@
     }
   });
 
+  function escapeHTML(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;",
+               '"': "&quot;", "'": "&#39;" })[c];
+    });
+  }
+
+  function drClass(dr) {
+    const n = Number(dr) || 0;
+    if (n >= 50) return "dr-high";
+    if (n >= 20) return "dr-mid";
+    return "";
+  }
+
+  function formatDR(dr) {
+    if (dr == null || dr === "") return "—";
+    const n = Number(dr);
+    if (Number.isNaN(n)) return String(dr);
+    return Number.isInteger(n) ? String(n) : n.toFixed(1);
+  }
+
+  function renderDetailTable(detail) {
+    const host = document.getElementById("detail-table");
+    if (!detail || !detail.length) {
+      host.innerHTML = '<div class="preview-empty">Không có backlink chất lượng phù hợp.</div>';
+      return;
+    }
+    const html = detail.map(function (g) {
+      const rows = g.rows.map(function (r, i) {
+        const cls = drClass(r.dr) || (i % 2 === 1 ? "dr-zebra" : "");
+        const refHost = (function () {
+          try { return new URL(r.ref_url).host.replace(/^www\./, ""); }
+          catch (e) { return r.ref_url; }
+        })();
+        return '<tr class="' + cls + '">' +
+          '<td class="num">' + r.stt + '</td>' +
+          '<td>' + escapeHTML(r.anchor) + '</td>' +
+          '<td class="url"><a href="' + escapeHTML(r.ref_url) +
+            '" target="_blank" rel="noopener" title="' + escapeHTML(r.ref_url) +
+            '">' + escapeHTML(refHost) + '</a></td>' +
+          '<td class="dr">' + formatDR(r.dr) + '</td>' +
+          '<td class="date">' + escapeHTML(r.first_seen) + '</td>' +
+          '</tr>';
+      }).join("");
+      return '<div class="preview-group">' +
+        '<div class="preview-group-head"><span class="chev">▼</span>' +
+        '<span>📌 ' + escapeHTML(g.target) + '</span>' +
+        '<span class="count">' + g.count + ' backlink</span></div>' +
+        '<table><thead><tr>' +
+          '<th class="num">STT</th><th>Anchor Text</th>' +
+          '<th>URL nguồn</th><th class="dr">DR</th>' +
+          '<th class="date">Ngày</th>' +
+        '</tr></thead><tbody>' + rows + '</tbody></table>' +
+        '</div>';
+    }).join("");
+    host.innerHTML = html;
+  }
+
+  function renderSummaryTable(summary) {
+    const host = document.getElementById("summary-table");
+    if (!summary || !summary.length) {
+      host.innerHTML = '<div class="preview-empty">Không có dữ liệu tổng hợp.</div>';
+      return;
+    }
+    const html = summary.map(function (g) {
+      const rows = g.rows.map(function (r, i) {
+        const cls = drClass(r.dr_max) || (i % 2 === 1 ? "dr-zebra" : "");
+        return '<tr class="' + cls + '">' +
+          '<td class="num">' + r.stt + '</td>' +
+          '<td>' + escapeHTML(r.domain) + '</td>' +
+          '<td class="dr">' + r.count + '</td>' +
+          '<td class="dr">' + formatDR(r.dr_max) + '</td>' +
+          '</tr>';
+      }).join("");
+      return '<div class="preview-group">' +
+        '<div class="preview-group-head"><span class="chev">▼</span>' +
+        '<span>📌 ' + escapeHTML(g.target_path) + '</span>' +
+        '<span class="count">' + g.total_links + ' link / ' +
+        g.domain_count + ' domain</span></div>' +
+        '<table><thead><tr>' +
+          '<th class="num">STT</th><th>Domain nguồn</th>' +
+          '<th class="dr">Số link</th><th class="dr">DR (max)</th>' +
+        '</tr></thead><tbody>' + rows + '</tbody></table>' +
+        '</div>';
+    }).join("");
+    host.innerHTML = html;
+  }
+
+  // Collapse/expand group headers (event-delegated, works for both panels).
+  document.addEventListener("click", function (e) {
+    const head = e.target.closest(".preview-group-head");
+    if (head) head.parentElement.classList.toggle("collapsed");
+  });
+
+  // Result tab switching.
+  document.querySelectorAll(".result-tabs .tab").forEach(function (tab) {
+    tab.addEventListener("click", function () {
+      const name = tab.getAttribute("data-result-tab");
+      document.querySelectorAll(".result-tabs .tab").forEach(function (t) {
+        t.classList.toggle("active", t === tab);
+      });
+      document.querySelectorAll(".result-panel").forEach(function (p) {
+        p.classList.toggle("active",
+          p.getAttribute("data-result-tab") === name);
+      });
+    });
+  });
+
   function renderResult(data) {
     const s = data.stats || {};
     const inputLabel = data.source === "ahrefs"
@@ -115,6 +223,11 @@
     }).join("");
     downloadLink.href = data.download_url;
     downloadLink.setAttribute("download", data.filename || "audit.xlsx");
+
+    const preview = data.preview || {};
+    renderDetailTable(preview.detail || []);
+    renderSummaryTable(preview.summary || []);
+
     resultCard.classList.remove("hidden");
     resultCard.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }

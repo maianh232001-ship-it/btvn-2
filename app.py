@@ -62,8 +62,8 @@ def audit_endpoint():
     out_path = OUTPUT_DIR / out_name
 
     try:
-        stats = run_audit(str(in_path), keyword, str(out_path),
-                          product_label=product_label)
+        result = run_audit(str(in_path), keyword, str(out_path),
+                           product_label=product_label)
     except Exception as exc:  # surface error to the UI
         try:
             in_path.unlink(missing_ok=True)
@@ -76,8 +76,10 @@ def audit_endpoint():
     except Exception:
         pass
 
+    preview = result.pop("preview", None)
     return jsonify({
-        "stats": stats,
+        "stats": result,
+        "preview": preview,
         "download_url": url_for("download_output", name=out_name),
         "filename": out_name,
     })
@@ -113,7 +115,7 @@ def audit_ahrefs_endpoint():
     out_path = OUTPUT_DIR / out_name
 
     try:
-        stats = run_audit_from_ahrefs(
+        result = run_audit_from_ahrefs(
             domain, api_key, keyword, str(out_path),
             product_label=product_label, limit=limit, mode=mode,
         )
@@ -125,8 +127,10 @@ def audit_ahrefs_endpoint():
     except Exception as exc:  # noqa: BLE001 — surface unexpected errors to UI
         return jsonify({"error": f"Xử lý thất bại: {exc}"}), 500
 
+    preview = result.pop("preview", None)
     return jsonify({
-        "stats": stats,
+        "stats": result,
+        "preview": preview,
         "download_url": url_for("download_output", name=out_name),
         "filename": out_name,
         "source": "ahrefs",
