@@ -5,7 +5,11 @@ styled two-sheet report similar to chi_tiet_anchor_backlink_reno15.xlsx.
 """
 from __future__ import annotations
 
+import json
 import re
+import urllib.error
+import urllib.parse
+import urllib.request
 from collections import defaultdict
 from datetime import date, datetime
 from typing import Iterable
@@ -14,6 +18,21 @@ from urllib.parse import urlparse
 import openpyxl
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
+
+
+AHREFS_BACKLINKS_ENDPOINT = "https://api.ahrefs.com/v3/site-explorer/all-backlinks"
+AHREFS_SELECT_FIELDS = (
+    "url_from,url_to,anchor,title,domain_rating_source,"
+    "first_seen_link,is_dofollow,is_spam"
+)
+
+
+class AhrefsAPIError(Exception):
+    """Raised when the Ahrefs API returns an error response."""
+
+    def __init__(self, message: str, status: int | None = None):
+        super().__init__(message)
+        self.status = status
 
 
 # --- Styling constants (matches the reno15 reference workbook) ---------------
@@ -125,6 +144,87 @@ def read_backlinks(path: str) -> list[dict]:
         records.append(record)
     wb.close()
     return records
+
+
+def fetch_from_ahrefs(domain: str, api_key: str,
+                      mode: str = "subdomains",
+                      limit: int = 1000,
+                      history: str = "all_time",
+                      timeout: int = 60) -> list[dict]:
+    """Fetch backlinks via Ahrefs API v3 and map fields to XLSX-style keys.
+
+    Returns rows with the same keys read_backlinks() produces, so the rest of
+    the audit pipeline can consume them unchanged.
+    """
+    target = (domain or "").strip()
+    if not target:
+        raise ValueError("Domain trống.")
+    if not (api_key or "").strip():
+        raise ValueError("API key trống.")
+
+    # Strip scheme / trailing slash so people can paste either form.
+    if "://" in target:
+        target = urlparse(target).netloc or target
+    target = target.strip("/")
+
+    params = {
+        "target": target,
+        "mode": mode,
+        "protocol": "both",
+        "select": AHREFS_SELECT_FIELDS,
+        "limit": str(int(limit)),
+        "history": history,
+        "output": "json",
+    }
+    url = f"{AHREFS_BACKLINKS_ENDPOINT}?{urllib.parse.urlencode(params)}"
+    req = urllib.request.Request(url, headers={
+        "Authorization": f"Bearer {api_key.strip()}",
+        "Accept": "application/json",
+    })
+
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            body = resp.read().decode("utf-8", errors="replace")
+    except urllib.error.HTTPError as exc:
+        detail = ""
+        try:
+            detail = exc.read().decode("utf-8", errors="replace")[:400]
+        except Exception:
+            pass
+        if exc.code == 401:
+            raise AhrefsAPIError(
+                "API key không hợp lệ hoặc đã hết hạn (HTTP 401).", 401)
+        if exc.code == 403:
+            raise AhrefsAPIError(
+                "Subscription của bạn không có quyền dùng endpoint này "
+                "(HTTP 403). Cần plan Standard trở lên.", 403)
+        if exc.code == 429:
+            raise AhrefsAPIError(
+                "Đã vượt rate limit của Ahrefs API (HTTP 429). Thử lại sau.",
+                429)
+        raise AhrefsAPIError(
+            f"Ahrefs API trả lỗi HTTP {exc.code}: {detail}", exc.code)
+    except urllib.error.URLError as exc:
+        raise AhrefsAPIError(f"Không kết nối được Ahrefs API: {exc.reason}")
+
+    try:
+        data = json.loads(body)
+    except json.JSONDecodeError:
+        raise AhrefsAPIError("Ahrefs trả về response không phải JSON.")
+
+    raw_rows = data.get("backlinks") or []
+    rows: list[dict] = []
+    for r in raw_rows:
+        rows.append({
+            "Target URL": r.get("url_to") or "",
+            "Anchor": r.get("anchor") or "",
+            "Referring page URL": r.get("url_from") or "",
+            "Referring page title": r.get("title") or "",
+            "Domain rating": r.get("domain_rating_source"),
+            "First seen": r.get("first_seen_link") or "",
+            "Is spam": str(r.get("is_spam", "")).lower(),
+        })
+    return rows
 
 
 # --- Audit pipeline ----------------------------------------------------------
@@ -331,15 +431,9 @@ def _write_summary_sheet(ws, summary: dict[str, list[dict]], product_label: str)
     ws.freeze_panes = "A4"
 
 
-def run_audit(backlinks_path: str, keyword: str, output_path: str,
-              product_label: str | None = None) -> dict:
-    """Run the full audit and write the styled workbook to output_path.
-
-    Returns a small stats dict for the UI.
-    """
-    rows = read_backlinks(backlinks_path)
-    if not rows:
-        raise ValueError("Không đọc được dữ liệu từ file backlinks.")
+def _build_report(rows: list[dict], keyword: str, output_path: str,
+                  product_label: str | None) -> dict:
+    """Filter, group, and write the styled workbook. Shared by both audit modes."""
     kept = filter_rows(rows, keyword)
     detail = build_detail(kept)
     summary = build_domain_summary(detail)
@@ -365,3 +459,27 @@ def run_audit(backlinks_path: str, keyword: str, output_path: str,
         "total_links": total_links,
         "total_domain_rows": total_domains,
     }
+
+
+def run_audit(backlinks_path: str, keyword: str, output_path: str,
+              product_label: str | None = None) -> dict:
+    """Run the full audit from a local XLSX file."""
+    rows = read_backlinks(backlinks_path)
+    if not rows:
+        raise ValueError("Không đọc được dữ liệu từ file backlinks.")
+    return _build_report(rows, keyword, output_path, product_label)
+
+
+def run_audit_from_ahrefs(domain: str, api_key: str, keyword: str,
+                          output_path: str,
+                          product_label: str | None = None,
+                          limit: int = 1000,
+                          mode: str = "subdomains") -> dict:
+    """Fetch backlinks via Ahrefs API, then build the styled report."""
+    rows = fetch_from_ahrefs(domain, api_key, mode=mode, limit=limit)
+    if not rows:
+        raise ValueError(
+            "Ahrefs không trả về backlink nào cho domain này "
+            "(kiểm tra lại domain hoặc subscription)."
+        )
+    return _build_report(rows, keyword, output_path, product_label)

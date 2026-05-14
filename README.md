@@ -46,7 +46,19 @@ static/script.js      ← Upload drag-and-drop + gọi API
 
 ## Cách dùng
 
+App có **2 chế độ** chọn qua tab:
+
+### A. Upload file XLSX
 1. Tải lên file `…-backlinks-subdomains_*.xlsx`
 2. Nhập từ khoá Target URL (vd `reno15`)
 3. Nhập nhãn sản phẩm tuỳ chọn (vd `Reno15`)
 4. Bấm **Bắt đầu audit** → tải file Excel kết quả
+
+### B. Lấy từ Ahrefs API (không cần file)
+1. Nhập domain cần audit (vd `thegioididong.com`)
+2. Dán **Ahrefs API key** (lấy tại [app.ahrefs.com/api](https://app.ahrefs.com/api), cần plan Standard trở lên)
+3. Nhập từ khoá Target URL + nhãn sản phẩm
+4. Chọn phạm vi (mode) và số backlink tối đa (mặc định 1000 — càng cao càng tốn credit)
+5. Bấm **Gọi Ahrefs & audit** → app tự fetch & build báo cáo
+
+🔒 API key chỉ truyền 1 lần trong request, **không lưu trên server**.

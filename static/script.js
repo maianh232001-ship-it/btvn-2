@@ -98,8 +98,11 @@
 
   function renderResult(data) {
     const s = data.stats || {};
+    const inputLabel = data.source === "ahrefs"
+      ? "Backlink từ Ahrefs"
+      : "Dòng đầu vào";
     const items = [
-      ["Dòng đầu vào", s.input_rows],
+      [inputLabel, s.input_rows],
       ["Backlink chất lượng", s.kept_rows],
       ["Target URL", s.target_urls],
       ["Tổng link giữ lại", s.total_links],
@@ -115,4 +118,68 @@
     resultCard.classList.remove("hidden");
     resultCard.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
+
+  // --- Tab switching ---
+  const tabs = document.querySelectorAll(".tab");
+  const panels = document.querySelectorAll(".tab-panel");
+  tabs.forEach(function (tab) {
+    tab.addEventListener("click", function () {
+      const name = tab.getAttribute("data-tab");
+      tabs.forEach(function (t) { t.classList.toggle("active", t === tab); });
+      panels.forEach(function (p) {
+        p.classList.toggle("active", p.getAttribute("data-tab") === name);
+      });
+    });
+  });
+
+  // --- Ahrefs form ---
+  const ahrefsForm = document.getElementById("ahrefs-form");
+  const ahrefsSubmit = document.getElementById("ahrefs-submit");
+  const ahrefsStatus = document.getElementById("ahrefs-status");
+
+  function setAhrefsStatus(text, kind) {
+    ahrefsStatus.textContent = text || "";
+    ahrefsStatus.className = "status" + (kind ? " " + kind : "");
+  }
+
+  ahrefsForm.addEventListener("submit", async function (e) {
+    e.preventDefault();
+    resultCard.classList.add("hidden");
+
+    const payload = {
+      domain: document.getElementById("ahrefs-domain").value.trim(),
+      api_key: document.getElementById("ahrefs-key").value.trim(),
+      keyword: document.getElementById("ahrefs-keyword").value.trim(),
+      product_label: document.getElementById("ahrefs-label").value.trim(),
+      mode: document.getElementById("ahrefs-mode").value,
+      limit: parseInt(document.getElementById("ahrefs-limit").value, 10) || 1000,
+    };
+
+    if (!payload.domain || !payload.api_key || !payload.keyword) {
+      setAhrefsStatus("Vui lòng nhập đủ domain, API key và từ khoá.", "err");
+      return;
+    }
+
+    ahrefsSubmit.disabled = true;
+    setAhrefsStatus("Đang gọi Ahrefs API…", "working");
+
+    try {
+      const res = await fetch("/api/audit-ahrefs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(function () { return {}; });
+      if (!res.ok) {
+        setAhrefsStatus(data.error || ("Lỗi (" + res.status + ")"), "err");
+        return;
+      }
+      renderResult(data);
+      setAhrefsStatus("Hoàn tất ✓ " + (data.domain || ""), "ok");
+    } catch (err) {
+      setAhrefsStatus("Lỗi mạng: " + err.message, "err");
+    } finally {
+      ahrefsSubmit.disabled = false;
+    }
+  });
 })();

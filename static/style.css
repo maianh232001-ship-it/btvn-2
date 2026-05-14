@@ -82,12 +82,46 @@ main {
 }
 .card h2 { margin: 0 0 12px; font-size: 18px; }
 
+/* ---- Tabs --------------------------------------------------------------- */
+.tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 2px solid var(--border);
+  margin: -8px -8px 20px;
+  padding: 0 8px;
+}
+.tab {
+  background: transparent;
+  border: none;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink-soft);
+  padding: 10px 16px;
+  cursor: pointer;
+  border-radius: 8px 8px 0 0;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.tab:hover { color: var(--ink); background: var(--yellow-soft); }
+.tab.active {
+  color: var(--ink);
+  border-bottom-color: var(--yellow);
+  background: var(--yellow-soft);
+}
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
 /* ---- Form -------------------------------------------------------------- */
 .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
 .field label { font-weight: 700; font-size: 14px; }
 .field small { color: var(--ink-soft); font-size: 12px; }
 
-input[type="text"] {
+input[type="text"],
+input[type="password"],
+input[type="number"],
+select {
   font-family: inherit;
   font-size: 15px;
   padding: 10px 12px;
@@ -97,10 +131,15 @@ input[type="text"] {
   outline: none;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
-input[type="text"]:focus {
+input[type="text"]:focus,
+input[type="password"]:focus,
+input[type="number"]:focus,
+select:focus {
   border-color: var(--yellow-deep);
   box-shadow: 0 0 0 3px var(--yellow-soft);
 }
+.field small a { color: var(--ink); font-weight: 700; }
+.field small a:hover { color: var(--yellow-deep); }
 
 .row {
   display: grid;

@@ -11,7 +11,7 @@ from flask import (Flask, abort, jsonify, render_template, request,
                    send_from_directory, url_for)
 from werkzeug.utils import secure_filename
 
-from audit import run_audit
+from audit import AhrefsAPIError, run_audit, run_audit_from_ahrefs
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -80,6 +80,57 @@ def audit_endpoint():
         "stats": stats,
         "download_url": url_for("download_output", name=out_name),
         "filename": out_name,
+    })
+
+
+@app.route("/api/audit-ahrefs", methods=["POST"])
+def audit_ahrefs_endpoint():
+    payload = request.get_json(silent=True) or {}
+    domain = (payload.get("domain") or "").strip()
+    api_key = (payload.get("api_key") or "").strip()
+    keyword = (payload.get("keyword") or "").strip()
+    product_label = (payload.get("product_label") or keyword).strip()
+    try:
+        limit = int(payload.get("limit") or 1000)
+    except (TypeError, ValueError):
+        limit = 1000
+    limit = max(1, min(limit, 10000))
+    mode = (payload.get("mode") or "subdomains").strip().lower()
+    if mode not in {"subdomains", "domain", "exact", "prefix"}:
+        mode = "subdomains"
+
+    if not domain:
+        return jsonify({"error": "Bạn chưa nhập domain."}), 400
+    if not api_key:
+        return jsonify({"error": "Bạn chưa nhập Ahrefs API key."}), 400
+    if not keyword:
+        return jsonify({"error": "Bạn chưa nhập từ khoá lọc Target URL."}), 400
+
+    token = secrets.token_hex(8)
+    out_name = (
+        f"chi_tiet_anchor_backlink_{_safe_label(product_label)}__{token}.xlsx"
+    )
+    out_path = OUTPUT_DIR / out_name
+
+    try:
+        stats = run_audit_from_ahrefs(
+            domain, api_key, keyword, str(out_path),
+            product_label=product_label, limit=limit, mode=mode,
+        )
+    except AhrefsAPIError as exc:
+        status = 502 if (exc.status or 0) >= 500 else 400
+        return jsonify({"error": str(exc)}), status
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except Exception as exc:  # noqa: BLE001 — surface unexpected errors to UI
+        return jsonify({"error": f"Xử lý thất bại: {exc}"}), 500
+
+    return jsonify({
+        "stats": stats,
+        "download_url": url_for("download_output", name=out_name),
+        "filename": out_name,
+        "source": "ahrefs",
+        "domain": domain,
     })
 
 

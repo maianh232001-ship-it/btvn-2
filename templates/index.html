@@ -21,37 +21,94 @@
       <p>Tải lên file <strong>Ahrefs backlinks (.xlsx)</strong>, nhập từ khoá Target URL (ví dụ <em>reno15</em>), nhận về file báo cáo có 2 sheet đã chia nhóm, tô màu theo Domain Rating.</p>
     </section>
 
-    <form id="audit-form" class="card">
-      <div class="field">
-        <label for="backlinks">1. File backlinks (.xlsx)</label>
-        <div class="drop" id="drop">
-          <input type="file" name="backlinks" id="backlinks" accept=".xlsx" required hidden />
-          <div class="drop-inner">
-            <span class="drop-icon">⤓</span>
-            <span class="drop-text">Kéo thả file vào đây hoặc <button type="button" id="pick-btn" class="link-btn">chọn file</button></span>
-            <span class="drop-hint" id="drop-hint">Hỗ trợ <code>www....-backlinks-subdomains_*.xlsx</code> · tối đa 25 MB</span>
+    <div class="card">
+      <div class="tabs" role="tablist">
+        <button type="button" class="tab active" data-tab="upload" role="tab">📁 Upload file XLSX</button>
+        <button type="button" class="tab" data-tab="ahrefs" role="tab">🔗 Lấy từ Ahrefs API</button>
+      </div>
+
+      <form id="audit-form" class="tab-panel active" data-tab="upload">
+        <div class="field">
+          <label for="backlinks">1. File backlinks (.xlsx)</label>
+          <div class="drop" id="drop">
+            <input type="file" name="backlinks" id="backlinks" accept=".xlsx" required hidden />
+            <div class="drop-inner">
+              <span class="drop-icon">⤓</span>
+              <span class="drop-text">Kéo thả file vào đây hoặc <button type="button" id="pick-btn" class="link-btn">chọn file</button></span>
+              <span class="drop-hint" id="drop-hint">Hỗ trợ <code>www....-backlinks-subdomains_*.xlsx</code> · tối đa 25 MB</span>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div class="row">
-        <div class="field">
-          <label for="keyword">2. Từ khoá Target URL</label>
-          <input type="text" name="keyword" id="keyword" placeholder="vd: reno15" required />
-          <small>Chỉ giữ các backlink có Target URL chứa chuỗi này.</small>
+        <div class="row">
+          <div class="field">
+            <label for="keyword">2. Từ khoá Target URL</label>
+            <input type="text" name="keyword" id="keyword" placeholder="vd: reno15" required />
+            <small>Chỉ giữ các backlink có Target URL chứa chuỗi này.</small>
+          </div>
+          <div class="field">
+            <label for="product_label">3. Nhãn sản phẩm (tuỳ chọn)</label>
+            <input type="text" name="product_label" id="product_label" placeholder="vd: Reno15" />
+            <small>Dùng cho tiêu đề báo cáo & tên file.</small>
+          </div>
         </div>
-        <div class="field">
-          <label for="product_label">3. Nhãn sản phẩm (tuỳ chọn)</label>
-          <input type="text" name="product_label" id="product_label" placeholder="vd: Reno15" />
-          <small>Dùng cho tiêu đề báo cáo & tên file. Để trống sẽ lấy theo từ khoá.</small>
-        </div>
-      </div>
 
-      <div class="actions">
-        <button type="submit" id="submit-btn" class="primary">Bắt đầu audit</button>
-        <span id="status" class="status" aria-live="polite"></span>
-      </div>
-    </form>
+        <div class="actions">
+          <button type="submit" id="submit-btn" class="primary">Bắt đầu audit</button>
+          <span id="status" class="status" aria-live="polite"></span>
+        </div>
+      </form>
+
+      <form id="ahrefs-form" class="tab-panel" data-tab="ahrefs">
+        <div class="field">
+          <label for="ahrefs-domain">1. Domain cần audit</label>
+          <input type="text" name="domain" id="ahrefs-domain" placeholder="vd: thegioididong.com" required />
+          <small>Nhập domain gốc, không cần <code>https://</code>. Ahrefs sẽ quét cả subdomain mặc định.</small>
+        </div>
+
+        <div class="field">
+          <label for="ahrefs-key">2. Ahrefs API key</label>
+          <input type="password" name="api_key" id="ahrefs-key" placeholder="dán API token Ahrefs..." required autocomplete="off" />
+          <small>🔒 Key chỉ truyền 1 lần để gọi API, <strong>không lưu trên server</strong>. Lấy key tại <a href="https://app.ahrefs.com/api" target="_blank" rel="noopener">app.ahrefs.com/api</a>.</small>
+        </div>
+
+        <div class="row">
+          <div class="field">
+            <label for="ahrefs-keyword">3. Từ khoá Target URL</label>
+            <input type="text" name="keyword" id="ahrefs-keyword" placeholder="vd: reno15" required />
+            <small>Chỉ giữ backlink có Target chứa chuỗi này.</small>
+          </div>
+          <div class="field">
+            <label for="ahrefs-label">4. Nhãn sản phẩm (tuỳ chọn)</label>
+            <input type="text" name="product_label" id="ahrefs-label" placeholder="vd: Reno15" />
+            <small>Dùng cho tiêu đề báo cáo.</small>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="field">
+            <label for="ahrefs-mode">5. Phạm vi (mode)</label>
+            <select name="mode" id="ahrefs-mode">
+              <option value="subdomains" selected>subdomains (toàn site + sub)</option>
+              <option value="domain">domain (chỉ domain chính)</option>
+              <option value="prefix">prefix (URL bắt đầu bằng)</option>
+              <option value="exact">exact (URL chính xác)</option>
+            </select>
+            <small>Mặc định <code>subdomains</code> giống file XLSX export.</small>
+          </div>
+          <div class="field">
+            <label for="ahrefs-limit">6. Số backlink tối đa</label>
+            <input type="number" name="limit" id="ahrefs-limit" min="1" max="10000" value="1000" />
+            <small>⚠️ Càng nhiều càng tốn credit Ahrefs. Mặc định 1000.</small>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button type="submit" id="ahrefs-submit" class="primary">Gọi Ahrefs &amp; audit</button>
+          <span id="ahrefs-status" class="status" aria-live="polite"></span>
+        </div>
+      </form>
+    </div>
 
     <section id="result" class="card result hidden">
       <h2>Kết quả</h2>
