@@ -7,22 +7,58 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
 </head>
 <body>
-  <header class="site-header">
-    <div class="brand">
-      <span class="logo">★</span>
-      <span class="brand-name">Backlink Audit</span>
-    </div>
-    <span class="tagline">Lọc Black Hat · Báo cáo Excel sẵn sàng gửi</span>
-  </header>
+  <button type="button" id="menu-toggle" class="menu-toggle" aria-label="Mở menu">☰</button>
 
-  <main>
-    <section class="hero">
+  <aside class="sidebar" id="sidebar" aria-label="Điều hướng chính">
+    <div class="sidebar-brand">
+      <span class="logo">★</span>
+      <div class="brand-text">
+        <span class="brand-name">BTVN</span>
+        <span class="brand-sub">Backlink Audit</span>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <a href="#home" class="nav-item active" data-section="home">
+        <span class="nav-icon">🏠</span>
+        <span>Trang chủ</span>
+      </a>
+      <a href="#audit" class="nav-item" data-section="audit">
+        <span class="nav-icon">🎯</span>
+        <span>Audit mới</span>
+      </a>
+      <a href="#demo-showcase" class="nav-item" data-section="demo-showcase">
+        <span class="nav-icon">🎬</span>
+        <span>Demo</span>
+      </a>
+      <a href="#guide" class="nav-item" data-section="guide">
+        <span class="nav-icon">📖</span>
+        <span>Hướng dẫn</span>
+      </a>
+      <a href="#settings" class="nav-item" data-section="settings">
+        <span class="nav-icon">⚙️</span>
+        <span>Setting</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="footer-label">🌐 Live</div>
+      <a href="https://btvn-2.onrender.com" target="_blank" rel="noopener" class="footer-link">btvn-2.onrender.com</a>
+      <a href="https://github.com/maianh232001-ship-it/btvn-2" target="_blank" rel="noopener" class="footer-link sub">github · btvn-2</a>
+    </div>
+  </aside>
+
+  <div class="sidebar-overlay" id="sidebar-overlay" aria-hidden="true"></div>
+
+  <main class="main">
+    <section id="home" class="hero">
+      <span class="tag">v1.2 · Helvetica · Yellow</span>
       <h1>Audit backlink từ file dữ liệu của bạn</h1>
       <p>Tải lên file <strong>Ahrefs backlinks (.xlsx)</strong>, nhập từ khoá Target URL (ví dụ <em>reno15</em>), nhận về file báo cáo có 2 sheet đã chia nhóm, tô màu theo Domain Rating.</p>
       <p class="hero-hint">👇 Cuộn xuống cuối trang để xem <a href="#demo-showcase">bảng kết quả mẫu</a> trước khi upload.</p>
     </section>
 
-    <div class="card">
+    <section id="audit" class="card">
       <div class="tabs" role="tablist">
         <button type="button" class="tab active" data-tab="upload" role="tab">📁 Upload file XLSX</button>
         <button type="button" class="tab" data-tab="ahrefs" role="tab">🔗 Lấy từ Ahrefs API</button>
@@ -109,7 +145,7 @@
           <span id="ahrefs-status" class="status" aria-live="polite"></span>
         </div>
       </form>
-    </div>
+    </section>
 
     <section id="result" class="card result hidden">
       <div class="result-head">
@@ -142,8 +178,8 @@
       </div>
     </section>
 
-    <section class="card guide">
-      <h2>Định dạng đầu ra</h2>
+    <section id="guide" class="card guide">
+      <h2>📖 Định dạng đầu ra</h2>
       <ul>
         <li><strong>Sheet 1 — Chi Tiết URL vs Anchor:</strong> liệt kê từng backlink theo Target URL, đã loại bỏ Black Hat. Dòng có DR ≥ 50 tô <span class="swatch hi"></span> xanh lá.</li>
         <li><strong>Sheet 2 — 📊 Domain vs URL:</strong> đếm số link & DR cao nhất theo domain nguồn. DR ≥ 50 tô <span class="swatch hi"></span>, DR 20–49 tô <span class="swatch mid"></span> vàng.</li>
@@ -184,11 +220,34 @@
         <div id="demo-summary-table" class="preview-table"></div>
       </div>
     </section>
-  </main>
 
-  <footer class="site-footer">
-    Theme · Helvetica · Yellow #F5C518
-  </footer>
+    <section id="settings" class="card">
+      <h2>⚙️ Setting</h2>
+      <p class="muted">Các tuỳ chọn dưới đây <strong>chỉ lưu trên trình duyệt của bạn</strong> (localStorage) — không ảnh hưởng người dùng khác.</p>
+      <div class="row">
+        <div class="field">
+          <label for="setting-dr-high">Ngưỡng DR "chất lượng cao" (mặc định 50)</label>
+          <input type="number" id="setting-dr-high" min="0" max="100" value="50" />
+          <small>Dòng có DR ≥ ngưỡng này sẽ tô xanh lá.</small>
+        </div>
+        <div class="field">
+          <label for="setting-dr-mid">Ngưỡng DR "trung bình" (mặc định 20)</label>
+          <input type="number" id="setting-dr-mid" min="0" max="100" value="20" />
+          <small>Tô vàng cho DR từ ngưỡng này đến ngưỡng cao.</small>
+        </div>
+      </div>
+      <div class="actions">
+        <button type="button" id="save-settings" class="primary">Lưu setting</button>
+        <button type="button" id="reset-settings" class="primary outline">Đặt lại mặc định</button>
+        <span id="settings-status" class="status" aria-live="polite"></span>
+      </div>
+    </section>
+
+    <footer class="site-footer">
+      Theme · Helvetica · Yellow #F5C518 · Repo:
+      <a href="https://github.com/maianh232001-ship-it/btvn-2" target="_blank" rel="noopener">github.com/maianh232001-ship-it/btvn-2</a>
+    </footer>
+  </main>
 
   <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>

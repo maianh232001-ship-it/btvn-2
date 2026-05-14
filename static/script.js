@@ -12,6 +12,132 @@
   const statsEl = document.getElementById("stats");
   const downloadLink = document.getElementById("download-link");
 
+  // --- Sidebar nav: active state via IntersectionObserver, mobile toggle ---
+  const navItems = document.querySelectorAll(".nav-item");
+  const menuToggle = document.getElementById("menu-toggle");
+  const sidebarOverlay = document.getElementById("sidebar-overlay");
+
+  function setActiveNav(sectionId) {
+    navItems.forEach(function (it) {
+      it.classList.toggle("active",
+        it.getAttribute("data-section") === sectionId);
+    });
+  }
+
+  // Smooth-scroll and close mobile sidebar on click.
+  navItems.forEach(function (it) {
+    it.addEventListener("click", function (e) {
+      const id = it.getAttribute("data-section");
+      const target = document.getElementById(id);
+      if (target) {
+        e.preventDefault();
+        target.scrollIntoView({ behavior: "smooth", block: "start" });
+        setActiveNav(id);
+        document.body.classList.remove("sidebar-open");
+      }
+    });
+  });
+
+  if (menuToggle) {
+    menuToggle.addEventListener("click", function () {
+      document.body.classList.toggle("sidebar-open");
+    });
+  }
+  if (sidebarOverlay) {
+    sidebarOverlay.addEventListener("click", function () {
+      document.body.classList.remove("sidebar-open");
+    });
+  }
+
+  // Highlight nav as user scrolls through sections.
+  const sectionIds = ["home", "audit", "demo-showcase", "guide", "settings"];
+  const observed = sectionIds
+    .map(function (id) { return document.getElementById(id); })
+    .filter(Boolean);
+  if ("IntersectionObserver" in window && observed.length) {
+    const io = new IntersectionObserver(function (entries) {
+      // Use the most-visible entry above the viewport midline.
+      const visible = entries
+        .filter(function (e) { return e.isIntersecting; })
+        .sort(function (a, b) {
+          return b.intersectionRatio - a.intersectionRatio;
+        });
+      if (visible[0]) setActiveNav(visible[0].target.id);
+    }, { rootMargin: "-30% 0px -50% 0px", threshold: [0, 0.25, 0.5, 0.75, 1] });
+    observed.forEach(function (el) { io.observe(el); });
+  }
+
+  // --- Settings (DR thresholds) — stored in localStorage ------------------
+  const drHighInput = document.getElementById("setting-dr-high");
+  const drMidInput = document.getElementById("setting-dr-mid");
+  const saveSettingsBtn = document.getElementById("save-settings");
+  const resetSettingsBtn = document.getElementById("reset-settings");
+  const settingsStatus = document.getElementById("settings-status");
+
+  let drHigh = 50;
+  let drMid = 20;
+
+  function loadSettings() {
+    try {
+      const raw = localStorage.getItem("btvn.settings");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (typeof parsed.drHigh === "number") drHigh = parsed.drHigh;
+        if (typeof parsed.drMid === "number") drMid = parsed.drMid;
+      }
+    } catch (e) { /* ignore */ }
+    if (drHighInput) drHighInput.value = drHigh;
+    if (drMidInput) drMidInput.value = drMid;
+  }
+
+  function persistSettings() {
+    const newHigh = parseInt(drHighInput.value, 10);
+    const newMid = parseInt(drMidInput.value, 10);
+    if (Number.isNaN(newHigh) || Number.isNaN(newMid) ||
+        newMid >= newHigh || newHigh > 100 || newMid < 0) {
+      settingsStatus.textContent = "Giá trị không hợp lệ (mid < high, 0–100).";
+      settingsStatus.className = "status err";
+      return;
+    }
+    drHigh = newHigh;
+    drMid = newMid;
+    localStorage.setItem("btvn.settings",
+      JSON.stringify({ drHigh: drHigh, drMid: drMid }));
+    settingsStatus.textContent = "Đã lưu ✓";
+    settingsStatus.className = "status ok";
+    // Re-render currently visible tables with new thresholds.
+    rerenderAll();
+  }
+
+  function resetSettings() {
+    drHigh = 50; drMid = 20;
+    localStorage.removeItem("btvn.settings");
+    drHighInput.value = drHigh;
+    drMidInput.value = drMid;
+    settingsStatus.textContent = "Đã đặt lại mặc định ✓";
+    settingsStatus.className = "status ok";
+    rerenderAll();
+  }
+
+  if (saveSettingsBtn) saveSettingsBtn.addEventListener("click", persistSettings);
+  if (resetSettingsBtn) resetSettingsBtn.addEventListener("click", resetSettings);
+  loadSettings();
+
+  let lastUserData = null;
+  let lastDemoData = null;
+  function rerenderAll() {
+    if (lastUserData) {
+      const p = lastUserData.preview || {};
+      renderDetailTable(p.detail || [], "detail-table");
+      renderSummaryTable(p.summary || [], "summary-table");
+    }
+    if (lastDemoData) {
+      const p = lastDemoData.preview || {};
+      renderDetailTable(p.detail || [], "demo-detail-table");
+      renderSummaryTable(p.summary || [], "demo-summary-table");
+    }
+  }
+
   function setStatus(text, kind) {
     statusEl.textContent = text || "";
     statusEl.className = "status" + (kind ? " " + kind : "");
@@ -105,8 +231,8 @@
 
   function drClass(dr) {
     const n = Number(dr) || 0;
-    if (n >= 50) return "dr-high";
-    if (n >= 20) return "dr-mid";
+    if (n >= drHigh) return "dr-high";
+    if (n >= drMid) return "dr-mid";
     return "";
   }
 
@@ -225,6 +351,7 @@
   }
 
   function renderResult(data) {
+    lastUserData = data;
     const s = data.stats || {};
     const inputLabel = data.source === "ahrefs"
       ? "Backlink từ Ahrefs" : "Dòng đầu vào";
@@ -275,6 +402,7 @@
           escapeHTML(data.error || res.status) + "</div>";
         return;
       }
+      lastDemoData = data;
       statsHost.innerHTML = buildStatsHTML(data.stats || {}, "Dòng đầu vào");
       const dl = document.getElementById("demo-download");
       dl.href = data.download_url;
