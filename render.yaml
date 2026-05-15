@@ -2,7 +2,6 @@ services:
   - type: web
     name: btvn-2
     runtime: python
-    rootDir: backend
     plan: free
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --timeout 120
@@ -10,5 +9,3 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.4
-      - key: ALLOWED_ORIGINS
-        value: "https://btvn-2-frontend.up.railway.app,http://localhost:3000"

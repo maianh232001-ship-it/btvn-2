@@ -1,17 +1,14 @@
-"""Flask API backend: upload backlinks XLSX → download styled audit report.
-
-Exposes JSON API endpoints consumed by the Next.js frontend. The legacy
-HTML routes have been removed — see ../frontend/ for the React UI.
-"""
+"""Flask web app: upload backlinks XLSX → download styled audit report."""
 from __future__ import annotations
 
 import os
 import re
 import secrets
+import uuid
 from pathlib import Path
 
-from flask import Flask, abort, jsonify, request, send_from_directory, url_for
-from flask_cors import CORS
+from flask import (Flask, abort, jsonify, render_template, request,
+                   send_from_directory, url_for)
 from werkzeug.utils import secure_filename
 
 from audit import AhrefsAPIError, run_audit, run_audit_from_ahrefs
@@ -26,16 +23,8 @@ OUTPUT_DIR.mkdir(exist_ok=True)
 ALLOWED_EXT = {".xlsx"}
 MAX_BYTES = 25 * 1024 * 1024  # 25 MB
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder="static", template_folder="templates")
 app.config["MAX_CONTENT_LENGTH"] = MAX_BYTES
-
-# CORS — allow the frontend origin(s) listed in ALLOWED_ORIGINS env var
-# (comma-separated). Defaults include localhost dev ports.
-_origins_env = os.environ.get("ALLOWED_ORIGINS",
-                              "http://localhost:3000,http://127.0.0.1:3000")
-ALLOWED_ORIGINS = [o.strip() for o in _origins_env.split(",") if o.strip()]
-CORS(app, resources={r"/api/*": {"origins": ALLOWED_ORIGINS},
-                     r"/download/*": {"origins": ALLOWED_ORIGINS}})
 
 # Bundled sample so visitors can preview the report format without uploading.
 DEMO_SAMPLE = BASE_DIR / (
@@ -48,28 +37,19 @@ _demo_cache: dict | None = None
 
 
 def _safe_label(label: str) -> str:
+    """Sanitize a label so it's safe as a filename token."""
     s = re.sub(r"[^A-Za-z0-9_\-]+", "_", (label or "").strip())
     return s.strip("_") or "report"
 
 
 @app.route("/")
-def root():
-    """Tiny status page so people who hit the API root see something useful."""
-    return jsonify({
-        "service": "btvn-2 backlink audit API",
-        "version": 2,
-        "endpoints": [
-            "GET  /api/demo",
-            "POST /api/audit (multipart: backlinks, keyword, product_label)",
-            "POST /api/audit-ahrefs (json: domain, api_key, keyword, ...)",
-            "GET  /download/<name>",
-        ],
-        "frontend": "see Next.js app in ../frontend/",
-    })
+def index():
+    return render_template("index.html")
 
 
 @app.route("/api/demo")
 def demo_endpoint():
+    """Return a cached preview built from the bundled TGDĐ + Reno15 sample."""
     global _demo_cache
     if not DEMO_SAMPLE.exists():
         return jsonify({"error": "File mẫu không có sẵn trên server."}), 404
@@ -86,8 +66,7 @@ def demo_endpoint():
         _demo_cache = {"stats": result, "preview": preview}
     return jsonify({
         **_demo_cache,
-        "download_url": url_for("download_output", name=DEMO_FILENAME,
-                                _external=True),
+        "download_url": url_for("download_output", name=DEMO_FILENAME),
         "filename": DEMO_FILENAME,
         "source": "demo",
         "demo": True,
@@ -114,27 +93,29 @@ def audit_endpoint():
     in_path = UPLOAD_DIR / f"{token}__{safe_name}"
     file.save(in_path)
 
-    out_name = (
-        f"chi_tiet_anchor_backlink_{_safe_label(product_label)}__{token}.xlsx"
-    )
+    out_name = f"chi_tiet_anchor_backlink_{_safe_label(product_label)}__{token}.xlsx"
     out_path = OUTPUT_DIR / out_name
 
     try:
         result = run_audit(str(in_path), keyword, str(out_path),
                            product_label=product_label)
-    except Exception as exc:
-        try: in_path.unlink(missing_ok=True)
-        except Exception: pass
+    except Exception as exc:  # surface error to the UI
+        try:
+            in_path.unlink(missing_ok=True)
+        except Exception:
+            pass
         return jsonify({"error": f"Xử lý thất bại: {exc}"}), 500
 
-    try: in_path.unlink(missing_ok=True)
-    except Exception: pass
+    try:
+        in_path.unlink(missing_ok=True)
+    except Exception:
+        pass
 
     preview = result.pop("preview", None)
     return jsonify({
         "stats": result,
         "preview": preview,
-        "download_url": url_for("download_output", name=out_name, _external=True),
+        "download_url": url_for("download_output", name=out_name),
         "filename": out_name,
     })
 
@@ -178,14 +159,14 @@ def audit_ahrefs_endpoint():
         return jsonify({"error": str(exc)}), status
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001 — surface unexpected errors to UI
         return jsonify({"error": f"Xử lý thất bại: {exc}"}), 500
 
     preview = result.pop("preview", None)
     return jsonify({
         "stats": result,
         "preview": preview,
-        "download_url": url_for("download_output", name=out_name, _external=True),
+        "download_url": url_for("download_output", name=out_name),
         "filename": out_name,
         "source": "ahrefs",
         "domain": domain,
@@ -205,4 +186,4 @@ def download_output(name: str):
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", "5050"))
-    app.run(host="0.0.0.0", port=port, debug=False)
+    app.run(host="127.0.0.1", port=port, debug=False)
