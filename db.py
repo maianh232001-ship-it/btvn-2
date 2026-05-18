@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import re
 from typing import Any
 
 import psycopg
@@ -33,7 +34,10 @@ _dsn: str | None = None
 def init_db(dsn: str | None = None) -> None:
     """Run schema if DATABASE_URL is configured. Silent no-op otherwise."""
     global _dsn
-    _dsn = (dsn or os.environ.get("DATABASE_URL") or "").strip() or None
+    raw = dsn or os.environ.get("DATABASE_URL") or ""
+    # Render's env-var UI sometimes preserves accidental line wraps from copy-
+    # paste; strip *all* whitespace since a valid postgres URI never has any.
+    _dsn = re.sub(r"\s+", "", raw) or None
     if _dsn is None:
         return
     with psycopg.connect(_dsn, connect_timeout=10) as conn:
