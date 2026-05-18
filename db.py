@@ -1,15 +1,17 @@
-"""SQLite storage for audit history."""
+"""Postgres storage for audit history (Supabase)."""
 from __future__ import annotations
 
-import sqlite3
-from pathlib import Path
+import os
 from typing import Any
+
+import psycopg
+from psycopg.rows import dict_row
 
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS audits (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    id BIGSERIAL PRIMARY KEY,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     source TEXT NOT NULL,
     domain TEXT,
     keyword TEXT NOT NULL,
@@ -25,24 +27,32 @@ CREATE INDEX IF NOT EXISTS idx_audits_created_at ON audits(created_at DESC);
 """
 
 
-_db_path: Path | None = None
+_dsn: str | None = None
 
 
-def init_db(path: str | Path) -> None:
-    """Create tables if needed. Call once at app startup."""
-    global _db_path
-    _db_path = Path(path)
-    _db_path.parent.mkdir(parents=True, exist_ok=True)
-    with sqlite3.connect(_db_path) as conn:
-        conn.executescript(SCHEMA)
+def init_db(dsn: str | None = None) -> None:
+    """Run schema if DATABASE_URL is configured. Silent no-op otherwise."""
+    global _dsn
+    _dsn = (dsn or os.environ.get("DATABASE_URL") or "").strip() or None
+    if _dsn is None:
+        return
+    with psycopg.connect(_dsn, connect_timeout=10) as conn:
+        with conn.cursor() as cur:
+            cur.execute(SCHEMA)
+        conn.commit()
 
 
-def _connect() -> sqlite3.Connection:
-    if _db_path is None:
-        raise RuntimeError("db.init_db() chưa được gọi.")
-    conn = sqlite3.connect(_db_path)
-    conn.row_factory = sqlite3.Row
-    return conn
+def is_configured() -> bool:
+    return _dsn is not None
+
+
+def _connect() -> psycopg.Connection:
+    if _dsn is None:
+        raise RuntimeError("DATABASE_URL chưa được set.")
+    # prepare_threshold=None: required for Supabase transaction pooler (PgBouncer).
+    return psycopg.connect(
+        _dsn, row_factory=dict_row, prepare_threshold=None, connect_timeout=10,
+    )
 
 
 def save_audit(
@@ -53,46 +63,64 @@ def save_audit(
     stats: dict[str, Any],
     output_filename: str,
     domain: str | None = None,
-) -> int:
-    """Persist one audit run. Returns the new row id."""
+) -> int | None:
+    """Persist one audit run. Returns new id, or None if DB is not configured."""
+    if not is_configured():
+        return None
     with _connect() as conn:
-        cur = conn.execute(
-            """
-            INSERT INTO audits (
-                source, domain, keyword, product_label,
-                input_rows, kept_rows, target_urls,
-                total_links, total_domain_rows, output_filename
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                source,
-                domain,
-                keyword,
-                product_label,
-                int(stats.get("input_rows", 0)),
-                int(stats.get("kept_rows", 0)),
-                int(stats.get("target_urls", 0)),
-                int(stats.get("total_links", 0)),
-                int(stats.get("total_domain_rows", 0)),
-                output_filename,
-            ),
-        )
-        return int(cur.lastrowid)
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO audits (
+                    source, domain, keyword, product_label,
+                    input_rows, kept_rows, target_urls,
+                    total_links, total_domain_rows, output_filename
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
+                """,
+                (
+                    source,
+                    domain,
+                    keyword,
+                    product_label,
+                    int(stats.get("input_rows", 0)),
+                    int(stats.get("kept_rows", 0)),
+                    int(stats.get("target_urls", 0)),
+                    int(stats.get("total_links", 0)),
+                    int(stats.get("total_domain_rows", 0)),
+                    output_filename,
+                ),
+            )
+            row = cur.fetchone()
+        conn.commit()
+    return int(row["id"]) if row else None
 
 
 def list_audits(limit: int = 50) -> list[dict[str, Any]]:
     """Return the most recent audits, newest first."""
+    if not is_configured():
+        return []
     limit = max(1, min(int(limit), 500))
     with _connect() as conn:
-        rows = conn.execute(
-            "SELECT * FROM audits ORDER BY datetime(created_at) DESC, id DESC LIMIT ?",
-            (limit,),
-        ).fetchall()
-    return [dict(r) for r in rows]
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT * FROM audits ORDER BY created_at DESC, id DESC LIMIT %s",
+                (limit,),
+            )
+            rows = cur.fetchall()
+    for r in rows:
+        ts = r.get("created_at")
+        if ts is not None:
+            r["created_at"] = ts.isoformat()
+    return rows
 
 
 def delete_audit(audit_id: int) -> bool:
-    """Remove one row. Returns True if a row was deleted."""
+    if not is_configured():
+        return False
     with _connect() as conn:
-        cur = conn.execute("DELETE FROM audits WHERE id = ?", (int(audit_id),))
-        return cur.rowcount > 0
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM audits WHERE id = %s", (int(audit_id),))
+            deleted = cur.rowcount > 0
+        conn.commit()
+    return deleted

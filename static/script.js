@@ -426,9 +426,7 @@
 
   function formatHistoryDate(s) {
     if (!s) return "—";
-    // SQLite "datetime('now')" returns UTC like "2026-05-18 03:42:11".
-    const iso = String(s).replace(" ", "T") + "Z";
-    const d = new Date(iso);
+    const d = new Date(s);
     if (isNaN(d.getTime())) return String(s);
     return d.toLocaleString("vi-VN", {
       year: "numeric", month: "2-digit", day: "2-digit",
@@ -483,6 +481,12 @@
     try {
       const res = await fetch("/api/history?limit=100");
       const data = await res.json().catch(function () { return {}; });
+      if (res.status === 503) {
+        historyHost.innerHTML =
+          '<div class="preview-empty">⚙️ ' +
+          escapeHTML(data.error || "Database chưa cấu hình.") + "</div>";
+        return;
+      }
       if (!res.ok) {
         historyHost.innerHTML =
           '<div class="preview-empty">Không tải được lịch sử: ' +
