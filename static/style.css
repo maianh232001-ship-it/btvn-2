@@ -506,8 +506,23 @@ select:focus {
 }
 
 /* ---- Guide ------------------------------------------------------------- */
-.guide ul { margin: 0; padding-left: 18px; }
+.guide ul, .guide ol { margin: 0 0 16px; padding-left: 20px; }
 .guide li { margin: 6px 0; }
+.guide h3 {
+  margin: 22px 0 10px;
+  font-size: 16px;
+  border-left: 3px solid var(--yellow);
+  padding-left: 10px;
+}
+.guide code { background: #FFF6D0; padding: 1px 6px; border-radius: 4px; font-size: 12.5px; }
+.guide .preview-table { margin: 0 0 14px; max-height: none; }
+.guide .preview-table th { position: static; }
+.preview-table table.schema th,
+.preview-table table.schema td {
+  padding: 8px 10px;
+  word-break: break-word;
+}
+.preview-table table.schema td code { font-size: 12px; }
 .swatch {
   display: inline-block; width: 14px; height: 14px;
   border-radius: 3px; border: 1px solid var(--border);

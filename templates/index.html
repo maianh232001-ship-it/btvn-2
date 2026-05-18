@@ -183,7 +183,65 @@
     </section>
 
     <section id="guide" class="card guide">
-      <h2>📖 Định dạng đầu ra</h2>
+      <h2>📖 Hướng dẫn</h2>
+
+      <h3>1. Định dạng file đầu vào (.xlsx)</h3>
+      <p>Tool đọc file <strong>Ahrefs backlinks export</strong> (subdomains mode). Sheet đầu tiên phải có dòng tiêu đề với <strong>tên cột chính xác như sau</strong> (case-sensitive, dấu cách giữ nguyên):</p>
+
+      <div class="preview-table">
+        <table class="schema">
+          <thead>
+            <tr><th>Cột (bắt buộc)</th><th>Kiểu</th><th>Mô tả</th><th>Ví dụ</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>Target URL</code></td><td>URL</td><td>Trang đích của backlink — tool lọc theo từ khoá trên cột này</td><td><code>https://www.thegioididong.com/dtdd/oppo-reno15</code></td></tr>
+            <tr><td><code>Anchor</code></td><td>text</td><td>Anchor text của link</td><td><code>oppo reno15</code></td></tr>
+            <tr><td><code>Referring page URL</code></td><td>URL</td><td>Trang nguồn chứa link trỏ về</td><td><code>https://vnreview.vn/oppo-reno15-review</code></td></tr>
+            <tr><td><code>Domain rating</code></td><td>số (0–100)</td><td>Domain Rating Ahrefs của domain nguồn</td><td><code>62</code></td></tr>
+            <tr><td><code>First seen</code></td><td>date</td><td>Ngày Ahrefs lần đầu thấy link</td><td><code>2026-03-12</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p><strong>Cột tuỳ chọn</strong> (dùng để lọc Black Hat — nếu thiếu thì bỏ qua bước này):</p>
+      <ul>
+        <li><code>Is spam</code> — <code>true/false</code>; nếu <code>true</code> sẽ bị loại.</li>
+        <li><code>Referring page title</code> — tool quét tiêu đề trang nguồn tìm dấu hiệu spam (casino, viagra, telegram link…).</li>
+      </ul>
+
+      <h3>2. Mẫu dữ liệu (1 dòng)</h3>
+      <div class="preview-table">
+        <table class="schema">
+          <thead>
+            <tr>
+              <th>Target URL</th><th>Anchor</th><th>Referring page URL</th>
+              <th class="num">Domain rating</th><th>First seen</th><th>Is spam</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>https://www.thegioididong.com/dtdd/oppo-reno15</code></td>
+              <td>oppo reno15 giá tốt</td>
+              <td><code>https://vnreview.vn/danh-gia-oppo-reno15</code></td>
+              <td class="num">62</td>
+              <td>2026-03-12</td>
+              <td>false</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>3. Cách lấy file từ Ahrefs</h3>
+      <ol>
+        <li>Vào <a href="https://app.ahrefs.com/site-explorer" target="_blank" rel="noopener">Site Explorer</a>, nhập domain cần audit (ví dụ <code>thegioididong.com</code>).</li>
+        <li>Sidebar trái → <strong>Backlink profile → Backlinks</strong>.</li>
+        <li>Mode chọn <strong>*.domain/*</strong> (subdomains) để lấy cả subdomain.</li>
+        <li>Bấm <strong>Export → Excel (.xlsx)</strong>, đợi Ahrefs gửi mail/notification khi file sẵn sàng.</li>
+        <li>Tải về → upload lên tab <em>📁 Upload file XLSX</em> ở trên. Hoặc bấm <a href="#demo-showcase">⇩ Tải file mẫu</a> trong section Demo để xem file mẫu thật.</li>
+      </ol>
+      <p class="muted">💡 Không có Ahrefs subscription? Dùng tab <em>🔗 Lấy từ Ahrefs API</em> nếu có API key, hoặc dùng file mẫu Reno15 ở section Demo để thử ngay.</p>
+
+      <h3>4. Định dạng file đầu ra</h3>
       <ul>
         <li><strong>Sheet 1 — Chi Tiết URL vs Anchor:</strong> liệt kê từng backlink theo Target URL, đã loại bỏ Black Hat. Dòng có DR ≥ 50 tô <span class="swatch hi"></span> xanh lá.</li>
         <li><strong>Sheet 2 — 📊 Domain vs URL:</strong> đếm số link & DR cao nhất theo domain nguồn. DR ≥ 50 tô <span class="swatch hi"></span>, DR 20–49 tô <span class="swatch mid"></span> vàng.</li>
