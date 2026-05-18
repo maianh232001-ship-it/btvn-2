@@ -18,10 +18,12 @@ import db
 BASE_DIR = Path(__file__).resolve().parent
 UPLOAD_DIR = BASE_DIR / "uploads"
 OUTPUT_DIR = BASE_DIR / "outputs"
-DB_PATH = BASE_DIR / "data" / "audits.db"
 UPLOAD_DIR.mkdir(exist_ok=True)
 OUTPUT_DIR.mkdir(exist_ok=True)
-db.init_db(DB_PATH)
+try:
+    db.init_db()
+except Exception as exc:  # noqa: BLE001
+    print(f"[db] init failed, history disabled: {exc}", flush=True)
 
 ALLOWED_EXT = {".xlsx"}
 MAX_BYTES = 25 * 1024 * 1024  # 25 MB
@@ -193,6 +195,11 @@ def audit_ahrefs_endpoint():
 
 @app.route("/api/history")
 def history_endpoint():
+    if not db.is_configured():
+        return jsonify({
+            "error": "Database chưa cấu hình. Set env var DATABASE_URL "
+                     "(Supabase connection string) rồi restart service.",
+        }), 503
     try:
         limit = int(request.args.get("limit", 50))
     except (TypeError, ValueError):
