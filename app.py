@@ -12,6 +12,7 @@ from flask import (Flask, abort, jsonify, render_template, request,
 from werkzeug.utils import secure_filename
 
 from audit import AhrefsAPIError, run_audit, run_audit_from_ahrefs
+import analyzer
 import db
 
 
@@ -234,6 +235,33 @@ def history_delete(audit_id: int):
     if not ok:
         return jsonify({"error": "Không tìm thấy bản ghi."}), 404
     return jsonify({"ok": True})
+
+
+@app.route("/api/analyze", methods=["POST"])
+def analyze_endpoint():
+    if not analyzer.is_configured():
+        return jsonify({
+            "error": "ANTHROPIC_API_KEY chưa được set trên server. "
+                     "Thêm env var rồi restart service.",
+        }), 503
+    payload = request.get_json(silent=True) or {}
+    stats = payload.get("stats") or {}
+    preview = payload.get("preview") or {}
+    label = (payload.get("label") or "").strip() or "Backlink Profile"
+    domain = (payload.get("domain") or "").strip() or None
+
+    if not preview.get("detail"):
+        return jsonify({"error": "Không có dữ liệu preview để phân tích."}), 400
+
+    try:
+        result = analyzer.generate_report(
+            stats=stats, preview=preview, label=label, domain=domain,
+        )
+    except Exception as exc:  # noqa: BLE001 — surface error type and message to UI
+        return jsonify({
+            "error": f"{type(exc).__name__}: {exc}",
+        }), 502
+    return jsonify(result)
 
 
 @app.route("/api/db-health")

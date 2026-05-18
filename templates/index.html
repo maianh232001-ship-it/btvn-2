@@ -154,9 +154,21 @@
     <section id="result" class="card result hidden">
       <div class="result-head">
         <h2 id="result-title">Kết quả</h2>
-        <a id="download-link" class="primary download" href="#" download>⇩ Tải báo cáo Excel</a>
+        <div class="result-actions">
+          <button type="button" id="analyze-btn" class="primary outline">🤖 Phân tích bằng AI</button>
+          <a id="download-link" class="primary download" href="#" download>⇩ Tải báo cáo Excel</a>
+        </div>
       </div>
       <div class="stats" id="stats"></div>
+
+      <div id="analysis-section" class="analysis hidden">
+        <div class="analysis-head">
+          <h3>📑 Báo cáo phân tích AI</h3>
+          <button type="button" id="analysis-download" class="link-btn" disabled>⇩ Tải .md</button>
+        </div>
+        <div id="analysis-status" class="status"></div>
+        <div id="analysis-content" class="analysis-content"></div>
+      </div>
 
       <div class="tabs result-tabs" role="tablist">
         <button type="button" class="tab active" data-result-tab="detail" role="tab">📋 Chi tiết URL vs Anchor</button>

@@ -530,6 +530,143 @@
 
   loadHistory();
 
+  // --- Claude-powered analysis -------------------------------------------------
+  const analyzeBtn = document.getElementById("analyze-btn");
+  const analysisSection = document.getElementById("analysis-section");
+  const analysisStatus = document.getElementById("analysis-status");
+  const analysisContent = document.getElementById("analysis-content");
+  const analysisDownload = document.getElementById("analysis-download");
+  let lastReport = "";
+  let lastReportFilename = "bao-cao-backlink.md";
+
+  function renderMarkdownSafe(md) {
+    const lines = String(md || "").split("\n");
+    const out = [];
+    let listType = null;
+    function closeList() {
+      if (listType === "ul") out.push("</ul>");
+      else if (listType === "ol") out.push("</ol>");
+      listType = null;
+    }
+    function inline(text) {
+      return escapeHTML(text)
+        .replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>")
+        .replace(/`([^`\n]+)`/g, "<code>$1</code>");
+    }
+    for (const raw of lines) {
+      const line = raw.trim();
+      if (!line) { closeList(); continue; }
+      let m;
+      if ((m = line.match(/^(#{1,4})\s+(.+)$/))) {
+        closeList();
+        const lvl = m[1].length;
+        out.push("<h" + lvl + ">" + inline(m[2]) + "</h" + lvl + ">");
+        continue;
+      }
+      if ((m = line.match(/^[-*]\s+(.+)$/))) {
+        if (listType !== "ul") { closeList(); out.push("<ul>"); listType = "ul"; }
+        out.push("<li>" + inline(m[1]) + "</li>");
+        continue;
+      }
+      if ((m = line.match(/^(\d+)\.\s+(.+)$/))) {
+        if (listType !== "ol") { closeList(); out.push("<ol>"); listType = "ol"; }
+        out.push("<li>" + inline(m[2]) + "</li>");
+        continue;
+      }
+      closeList();
+      out.push("<p>" + inline(line) + "</p>");
+    }
+    closeList();
+    return out.join("\n");
+  }
+
+  function setAnalysisStatus(text, kind) {
+    if (!analysisStatus) return;
+    analysisStatus.textContent = text || "";
+    analysisStatus.className = "status" + (kind ? " " + kind : "");
+  }
+
+  function pickAnalysisLabel(data) {
+    if (data.product_label) return data.product_label;
+    if (data.domain) return data.domain;
+    const fn = data.filename || "";
+    const m = fn.match(/chi_tiet_anchor_backlink_(.+?)__[a-z0-9]+\.xlsx$/i);
+    return m ? m[1].replace(/_/g, " ") : "Backlink Profile";
+  }
+
+  async function runAnalyze() {
+    const data = lastUserData || lastDemoData;
+    if (!data) {
+      alert("Chưa có dữ liệu audit. Hãy chạy audit hoặc xem demo trước.");
+      return;
+    }
+    const label = pickAnalysisLabel(data);
+    lastReportFilename = "bao-cao-backlink-" +
+      label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") +
+      ".md";
+
+    analyzeBtn.disabled = true;
+    analysisSection.classList.remove("hidden");
+    analysisContent.innerHTML = "";
+    analysisDownload.disabled = true;
+    setAnalysisStatus("Đang gọi Claude (có thể mất 10–30 giây)…", "working");
+    analysisSection.scrollIntoView({ behavior: "smooth", block: "nearest" });
+
+    try {
+      const res = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          stats: data.stats || {},
+          preview: data.preview || {},
+          label: label,
+          domain: data.domain || null,
+        }),
+      });
+      const result = await res.json().catch(function () { return {}; });
+      if (res.status === 503) {
+        setAnalysisStatus("⚙️ " + (result.error || "Chưa cấu hình ANTHROPIC_API_KEY."), "err");
+        return;
+      }
+      if (!res.ok) {
+        setAnalysisStatus(result.error || ("Lỗi (" + res.status + ")"), "err");
+        return;
+      }
+      lastReport = result.report || "";
+      analysisContent.innerHTML = renderMarkdownSafe(lastReport);
+      analysisDownload.disabled = !lastReport;
+      const u = result.usage || {};
+      const cached = (u.cache_read_input_tokens || 0) > 0
+        ? " · cache hit " + u.cache_read_input_tokens + " tok" : "";
+      setAnalysisStatus(
+        "Hoàn tất ✓ · " + (result.model || "claude") + " · " +
+        (u.input_tokens || 0) + "→" + (u.output_tokens || 0) + " tokens" + cached,
+        "ok"
+      );
+    } catch (err) {
+      setAnalysisStatus("Lỗi mạng: " + err.message, "err");
+    } finally {
+      analyzeBtn.disabled = false;
+    }
+  }
+
+  if (analyzeBtn) analyzeBtn.addEventListener("click", runAnalyze);
+
+  if (analysisDownload) {
+    analysisDownload.addEventListener("click", function () {
+      if (!lastReport) return;
+      const blob = new Blob([lastReport], { type: "text/markdown;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = lastReportFilename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    });
+  }
+
   ahrefsForm.addEventListener("submit", async function (e) {
     e.preventDefault();
     resultCard.classList.add("hidden");
