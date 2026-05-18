@@ -12,13 +12,16 @@ from flask import (Flask, abort, jsonify, render_template, request,
 from werkzeug.utils import secure_filename
 
 from audit import AhrefsAPIError, run_audit, run_audit_from_ahrefs
+import db
 
 
 BASE_DIR = Path(__file__).resolve().parent
 UPLOAD_DIR = BASE_DIR / "uploads"
 OUTPUT_DIR = BASE_DIR / "outputs"
+DB_PATH = BASE_DIR / "data" / "audits.db"
 UPLOAD_DIR.mkdir(exist_ok=True)
 OUTPUT_DIR.mkdir(exist_ok=True)
+db.init_db(DB_PATH)
 
 ALLOWED_EXT = {".xlsx"}
 MAX_BYTES = 25 * 1024 * 1024  # 25 MB
@@ -112,6 +115,13 @@ def audit_endpoint():
         pass
 
     preview = result.pop("preview", None)
+    db.save_audit(
+        source="upload",
+        keyword=keyword,
+        product_label=product_label or keyword,
+        stats=result,
+        output_filename=out_name,
+    )
     return jsonify({
         "stats": result,
         "preview": preview,
@@ -163,6 +173,14 @@ def audit_ahrefs_endpoint():
         return jsonify({"error": f"Xử lý thất bại: {exc}"}), 500
 
     preview = result.pop("preview", None)
+    db.save_audit(
+        source="ahrefs",
+        domain=domain,
+        keyword=keyword,
+        product_label=product_label or keyword,
+        stats=result,
+        output_filename=out_name,
+    )
     return jsonify({
         "stats": result,
         "preview": preview,
@@ -171,6 +189,30 @@ def audit_ahrefs_endpoint():
         "source": "ahrefs",
         "domain": domain,
     })
+
+
+@app.route("/api/history")
+def history_endpoint():
+    try:
+        limit = int(request.args.get("limit", 50))
+    except (TypeError, ValueError):
+        limit = 50
+    items = db.list_audits(limit=limit)
+    for item in items:
+        out = item.get("output_filename")
+        if out and (OUTPUT_DIR / out).exists():
+            item["download_url"] = url_for("download_output", name=out)
+        else:
+            item["download_url"] = None
+    return jsonify({"items": items, "count": len(items)})
+
+
+@app.route("/api/history/<int:audit_id>", methods=["DELETE"])
+def history_delete(audit_id: int):
+    ok = db.delete_audit(audit_id)
+    if not ok:
+        return jsonify({"error": "Không tìm thấy bản ghi."}), 404
+    return jsonify({"ok": True})
 
 
 @app.route("/download/<path:name>")

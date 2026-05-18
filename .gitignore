@@ -1,6 +1,7 @@
 # Runtime data — never commit user uploads or generated reports
 uploads/
 outputs/
+data/
 
 # Python
 __pycache__/

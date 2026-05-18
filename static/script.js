@@ -50,7 +50,7 @@
   }
 
   // Highlight nav as user scrolls through sections.
-  const sectionIds = ["home", "audit", "demo-showcase", "guide", "settings"];
+  const sectionIds = ["home", "audit", "demo-showcase", "history", "guide", "settings"];
   const observed = sectionIds
     .map(function (id) { return document.getElementById(id); })
     .filter(Boolean);
@@ -365,6 +365,8 @@
 
     resultCard.classList.remove("hidden");
     resultCard.scrollIntoView({ behavior: "smooth", block: "nearest" });
+
+    loadHistory();
   }
 
   // --- Tab switching ---
@@ -417,6 +419,112 @@
     }
   }
   loadDemoShowcase();
+
+  // --- Audit history (DB-backed) -------------------------------------------
+  const historyHost = document.getElementById("history-table");
+  const historyRefreshBtn = document.getElementById("history-refresh");
+
+  function formatHistoryDate(s) {
+    if (!s) return "—";
+    // SQLite "datetime('now')" returns UTC like "2026-05-18 03:42:11".
+    const iso = String(s).replace(" ", "T") + "Z";
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return String(s);
+    return d.toLocaleString("vi-VN", {
+      year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit",
+    });
+  }
+
+  function renderHistoryTable(items) {
+    if (!historyHost) return;
+    if (!items || !items.length) {
+      historyHost.innerHTML =
+        '<div class="preview-empty">Chưa có lần audit nào được lưu.</div>';
+      return;
+    }
+    const rows = items.map(function (it) {
+      const sourceLabel = it.source === "ahrefs"
+        ? "Ahrefs API"
+        : (it.source === "demo" ? "Demo" : "Upload");
+      const target = it.source === "ahrefs"
+        ? (it.domain || "—")
+        : (it.product_label || it.keyword || "—");
+      const dl = it.download_url
+        ? '<a class="link-btn" href="' + escapeHTML(it.download_url) +
+          '" download>⇩ Tải</a>'
+        : '<span class="muted">đã dọn</span>';
+      return '<tr>' +
+        '<td>' + escapeHTML(formatHistoryDate(it.created_at)) + '</td>' +
+        '<td>' + escapeHTML(sourceLabel) + '</td>' +
+        '<td>' + escapeHTML(target) + '</td>' +
+        '<td>' + escapeHTML(it.keyword || "") + '</td>' +
+        '<td class="num">' + (it.kept_rows ?? "—") + '</td>' +
+        '<td class="num">' + (it.target_urls ?? "—") + '</td>' +
+        '<td class="num">' + (it.total_links ?? "—") + '</td>' +
+        '<td>' + dl + ' · ' +
+        '<button type="button" class="link-btn history-del" data-id="' +
+        it.id + '">✕ Xoá</button></td>' +
+        '</tr>';
+    }).join("");
+
+    historyHost.innerHTML =
+      '<table class="history">' +
+      '<thead><tr>' +
+      '<th>Thời gian</th><th>Nguồn</th><th>Domain / Nhãn</th>' +
+      '<th>Từ khoá</th><th class="num">Giữ lại</th>' +
+      '<th class="num">Target</th><th class="num">Tổng link</th>' +
+      '<th>Hành động</th>' +
+      '</tr></thead><tbody>' + rows + '</tbody></table>';
+  }
+
+  async function loadHistory() {
+    if (!historyHost) return;
+    try {
+      const res = await fetch("/api/history?limit=100");
+      const data = await res.json().catch(function () { return {}; });
+      if (!res.ok) {
+        historyHost.innerHTML =
+          '<div class="preview-empty">Không tải được lịch sử: ' +
+          escapeHTML(data.error || res.status) + "</div>";
+        return;
+      }
+      renderHistoryTable(data.items || []);
+    } catch (err) {
+      historyHost.innerHTML =
+        '<div class="preview-empty">Lỗi mạng: ' + escapeHTML(err.message) + "</div>";
+    }
+  }
+
+  if (historyRefreshBtn) {
+    historyRefreshBtn.addEventListener("click", loadHistory);
+  }
+
+  if (historyHost) {
+    historyHost.addEventListener("click", async function (e) {
+      const btn = e.target.closest(".history-del");
+      if (!btn) return;
+      const id = btn.getAttribute("data-id");
+      if (!id || !confirm("Xoá bản ghi này khỏi lịch sử?")) return;
+      btn.disabled = true;
+      try {
+        const res = await fetch("/api/history/" + encodeURIComponent(id), {
+          method: "DELETE",
+        });
+        if (!res.ok) {
+          alert("Xoá thất bại (" + res.status + ").");
+          btn.disabled = false;
+          return;
+        }
+        loadHistory();
+      } catch (err) {
+        alert("Lỗi mạng: " + err.message);
+        btn.disabled = false;
+      }
+    });
+  }
+
+  loadHistory();
 
   ahrefsForm.addEventListener("submit", async function (e) {
     e.preventDefault();
