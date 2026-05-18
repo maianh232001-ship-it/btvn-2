@@ -117,13 +117,16 @@ def audit_endpoint():
         pass
 
     preview = result.pop("preview", None)
-    db.save_audit(
-        source="upload",
-        keyword=keyword,
-        product_label=product_label or keyword,
-        stats=result,
-        output_filename=out_name,
-    )
+    try:
+        db.save_audit(
+            source="upload",
+            keyword=keyword,
+            product_label=product_label or keyword,
+            stats=result,
+            output_filename=out_name,
+        )
+    except Exception as exc:  # noqa: BLE001 — don't fail the audit if DB save errors
+        print(f"[db] save_audit (upload) failed: {exc}", flush=True)
     return jsonify({
         "stats": result,
         "preview": preview,
@@ -175,14 +178,17 @@ def audit_ahrefs_endpoint():
         return jsonify({"error": f"Xử lý thất bại: {exc}"}), 500
 
     preview = result.pop("preview", None)
-    db.save_audit(
-        source="ahrefs",
-        domain=domain,
-        keyword=keyword,
-        product_label=product_label or keyword,
-        stats=result,
-        output_filename=out_name,
-    )
+    try:
+        db.save_audit(
+            source="ahrefs",
+            domain=domain,
+            keyword=keyword,
+            product_label=product_label or keyword,
+            stats=result,
+            output_filename=out_name,
+        )
+    except Exception as exc:  # noqa: BLE001 — don't fail the audit if DB save errors
+        print(f"[db] save_audit (ahrefs) failed: {exc}", flush=True)
     return jsonify({
         "stats": result,
         "preview": preview,
@@ -204,7 +210,12 @@ def history_endpoint():
         limit = int(request.args.get("limit", 50))
     except (TypeError, ValueError):
         limit = 50
-    items = db.list_audits(limit=limit)
+    try:
+        items = db.list_audits(limit=limit)
+    except Exception as exc:  # noqa: BLE001 — surface DB errors to the UI
+        return jsonify({
+            "error": f"Lỗi kết nối database: {type(exc).__name__}: {exc}",
+        }), 500
     for item in items:
         out = item.get("output_filename")
         if out and (OUTPUT_DIR / out).exists():
@@ -216,10 +227,29 @@ def history_endpoint():
 
 @app.route("/api/history/<int:audit_id>", methods=["DELETE"])
 def history_delete(audit_id: int):
-    ok = db.delete_audit(audit_id)
+    try:
+        ok = db.delete_audit(audit_id)
+    except Exception as exc:  # noqa: BLE001
+        return jsonify({"error": f"Lỗi DB: {type(exc).__name__}: {exc}"}), 500
     if not ok:
         return jsonify({"error": "Không tìm thấy bản ghi."}), 404
     return jsonify({"ok": True})
+
+
+@app.route("/api/db-health")
+def db_health():
+    """Diagnostic endpoint: tries a trivial DB query, returns details on failure."""
+    if not db.is_configured():
+        return jsonify({"ok": False, "reason": "DATABASE_URL not set"}), 503
+    try:
+        items = db.list_audits(limit=1)
+        return jsonify({"ok": True, "rows_visible": len(items)})
+    except Exception as exc:  # noqa: BLE001
+        return jsonify({
+            "ok": False,
+            "error_type": type(exc).__name__,
+            "error": str(exc),
+        }), 500
 
 
 @app.route("/download/<path:name>")
