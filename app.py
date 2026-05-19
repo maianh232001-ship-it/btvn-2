@@ -249,6 +249,15 @@ def analyze_endpoint():
     preview = payload.get("preview") or {}
     label = (payload.get("label") or "").strip() or "Backlink Profile"
     domain = (payload.get("domain") or "").strip() or None
+    industry = (payload.get("industry") or "").strip() or None
+    try:
+        dr_high = int(payload.get("dr_high") or analyzer.DEFAULT_DR_HIGH)
+        dr_mid = int(payload.get("dr_mid") or analyzer.DEFAULT_DR_MID)
+    except (TypeError, ValueError):
+        dr_high = analyzer.DEFAULT_DR_HIGH
+        dr_mid = analyzer.DEFAULT_DR_MID
+    if dr_mid >= dr_high:
+        return jsonify({"error": "dr_mid phải nhỏ hơn dr_high."}), 400
 
     if not preview.get("detail"):
         return jsonify({"error": "Không có dữ liệu preview để phân tích."}), 400
@@ -256,6 +265,7 @@ def analyze_endpoint():
     try:
         result = analyzer.generate_report(
             stats=stats, preview=preview, label=label, domain=domain,
+            industry=industry, dr_high=dr_high, dr_mid=dr_mid,
         )
     except Exception as exc:  # noqa: BLE001 — surface error type and message to UI
         return jsonify({

@@ -54,12 +54,20 @@ Nhiệm vụ: Phân tích dữ liệu backlink audit và viết báo cáo bằng
 """
 
 
-CRITERIA = """# Tiêu chuẩn đánh giá backlink
+DEFAULT_DR_HIGH = 70
+DEFAULT_DR_MID = 40
 
+
+def _build_criteria(dr_high: int, dr_mid: int, industry: str | None) -> str:
+    industry_note = ""
+    if industry:
+        industry_note = f"\n## Bối cảnh ngành\n- Website thuộc ngành: **{industry}**. Cân nhắc đặc thù ngành khi đánh giá (vd: e-commerce cần DR cao + anchor branded chiếm ưu thế; media chấp nhận generic anchor nhiều hơn; SaaS thường mix forum/blog tech).\n"
+    return f"""# Tiêu chuẩn đánh giá backlink
+{industry_note}
 ## Domain Rating (DR)
-- DR >= 70: Tốt (high-authority)
-- DR 40-69: Trung bình
-- DR < 40: Yếu
+- DR >= {dr_high}: Tốt (high-authority)
+- DR {dr_mid}-{dr_high - 1}: Trung bình
+- DR < {dr_mid}: Yếu
 
 ## Anchor Text (tỉ lệ tự nhiên)
 - Branded (tên thương hiệu): 40-60%
@@ -80,7 +88,8 @@ CRITERIA = """# Tiêu chuẩn đánh giá backlink
 
 
 def _summarize_preview(preview: dict, *, max_anchors: int = 20,
-                        max_domains: int = 20) -> dict:
+                        max_domains: int = 20,
+                        dr_high: int = 70, dr_mid: int = 40) -> dict:
     """Aggregate detail/summary rows into a compact payload for Claude."""
     detail = preview.get("detail") or []
     summary = preview.get("summary") or []
@@ -89,18 +98,21 @@ def _summarize_preview(preview: dict, *, max_anchors: int = 20,
     for group in detail:
         all_rows.extend(group.get("rows") or [])
 
-    dr_buckets = {"high_ge70": 0, "mid_40_69": 0, "low_lt40": 0}
+    high_key = f"high_ge{dr_high}"
+    mid_key = f"mid_{dr_mid}_{dr_high - 1}"
+    low_key = f"low_lt{dr_mid}"
+    dr_buckets = {high_key: 0, mid_key: 0, low_key: 0}
     for r in all_rows:
         try:
             dr = float(r.get("dr") or 0)
         except (TypeError, ValueError):
             dr = 0
-        if dr >= 70:
-            dr_buckets["high_ge70"] += 1
-        elif dr >= 40:
-            dr_buckets["mid_40_69"] += 1
+        if dr >= dr_high:
+            dr_buckets[high_key] += 1
+        elif dr >= dr_mid:
+            dr_buckets[mid_key] += 1
         else:
-            dr_buckets["low_lt40"] += 1
+            dr_buckets[low_key] += 1
 
     anchor_counts: Counter[str] = Counter()
     for r in all_rows:
@@ -142,6 +154,9 @@ def generate_report(
     preview: dict[str, Any],
     label: str,
     domain: str | None = None,
+    industry: str | None = None,
+    dr_high: int = DEFAULT_DR_HIGH,
+    dr_mid: int = DEFAULT_DR_MID,
     model: str = "claude-opus-4-7",
 ) -> dict[str, Any]:
     """Call Claude to produce a markdown analysis report.
@@ -151,10 +166,12 @@ def generate_report(
     """
     client = anthropic.Anthropic()
 
-    compact = _summarize_preview(preview)
+    compact = _summarize_preview(preview, dr_high=dr_high, dr_mid=dr_mid)
     payload = {
         "label": label,
         "domain": domain,
+        "industry": industry,
+        "dr_thresholds": {"high": dr_high, "mid": dr_mid},
         "stats": {
             k: stats.get(k)
             for k in (
@@ -177,7 +194,7 @@ def generate_report(
         output_config={"effort": "medium"},
         system=[
             {"type": "text", "text": SYSTEM_PROMPT},
-            {"type": "text", "text": CRITERIA},
+            {"type": "text", "text": _build_criteria(dr_high, dr_mid, industry)},
         ],
         messages=[{"role": "user", "content": user_msg}],
     )
